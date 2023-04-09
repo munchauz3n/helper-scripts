@@ -317,13 +317,13 @@ common_desktop_setup() {
 
 gnome_desktop_setup() {
   msg debug "Installing GNOME packages..."
-  pacstrap ${TMPDIR} baobab cheese eog evince file-roller gdm gedit gnome-backgrounds \
+  pacstrap ${TMPDIR} baobab eog evince file-roller gdm gedit gnome-backgrounds \
      gnome-calculator gnome-calendar gnome-clocks gnome-control-center gnome-logs gnome-menus \
      gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
      gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
      gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth \
-     gnome-icon-theme gnome-icon-theme-extras gnome-software xdg-user-dirs mutter nautilus sushi \
-     gvfs yelp guake pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
+     gnome-icon-theme-extras gnome-software xdg-user-dirs mutter nautilus sushi gvfs yelp guake \
+     pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
 
   msg debug "Enabling the GDM service..."
   arch-chroot ${TMPDIR} systemctl enable gdm.service 1> /dev/null 2>&1
