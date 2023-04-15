@@ -24,7 +24,7 @@ declare -a ENVIRONMENTS=(
   "Console" "Bare console environment" "on"
   "GNOME" "Modern and simple desktop - minimal installation" "off"
 #  "KDE" "Flashy desktop with many features - minimal installation" "off"
-#  "XFCE" "Reliable and fast desktop - minimal installation" "off"
+  "XFCE" "Reliable and fast desktop - minimal installation" "off"
 )
 
 # List of possible processor microcodes.
@@ -463,6 +463,18 @@ gnome_desktop_setup() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
+xfce_desktop_setup() {
+  msg debug "Installing XFCE packages..."
+  pacstrap ${TMPDIR} exo garcon thunar thunar-volman tumbler xfwm4 xfwm4-themes xfconf xfdesktop4 \
+    xfce4-appfinder xfce4-panel fce4-power-manager xfce4-session xfce4-settings xfce4-terminal \
+    xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-pulseaudio-plugin xfce4-mount-plugin \
+    xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-xkb-plugin xfce4-sensors-plugin mousepad \
+    ristretto 1> /dev/null 2>&1
+
+  # Check pacstrap return value.
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to install XFCE packages!"; exit 1; }
+}
+
 installation() {
   msg info "Creating installation..."
 
@@ -697,6 +709,7 @@ installation() {
   msg debug "Installing desktop environment..."
   [[ ${ENVIRONMENT} == "Console" ]] && console_setup
   [[ ${ENVIRONMENT} == "GNOME" ]] && common_desktop_setup && gnome_desktop_setup
+  [[ ${ENVIRONMENT} == "XFCE" ]] && common_desktop_setup && xfce_desktop_setup
 
   msg debug "Install complete"
 }
