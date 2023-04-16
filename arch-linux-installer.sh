@@ -147,10 +147,8 @@ prepare() {
   # Check sgdisk return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to clear GPT/MBR data!"; exit 1; }
 
+  # Wipe filesystem information.
   wipefs -a ${DRIVE} 1> /dev/null 2>&1
-
-  # Check wipefs return value.
-  [[ $? == +(1|255) ]] && { clear; msg error "Failed to wipe filesystem!"; exit 1; }
 
   msg log "Creating partition table..."
   sgdisk --clear \
@@ -256,7 +254,7 @@ prepare() {
   msg log "Done"
 }
 
-console_setup() {
+setup_console_environment() {
   msg log "Installing ACPI daemon..."
   pacstrap ${TMPDIR} acpid 1> /dev/null 2>&1
 
@@ -324,7 +322,7 @@ console_setup() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable resolve daemon service!"; exit 1; }
 }
 
-common_desktop_setup() {
+setup_common_environment() {
   msg log "Installing Xorg display server and xinitrc..."
   pacstrap ${TMPDIR} xorg-server xorg-xinit 1> /dev/null 2>&1
 
@@ -424,7 +422,7 @@ common_desktop_setup() {
   fi
 }
 
-gnome_desktop_setup() {
+setup_gnome_environment() {
   msg log "Installing GNOME packages..."
   pacstrap ${TMPDIR} baobab eog evince file-roller gdm gedit gnome-backgrounds \
            gnome-calculator gnome-calendar gnome-clocks gnome-control-center gnome-logs gnome-menus \
@@ -460,13 +458,13 @@ gnome_desktop_setup() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
-xfce_desktop_setup() {
+setup_xfce_environment() {
   msg log "Installing XFCE packages..."
-  pacstrap ${TMPDIR} exo garcon thunar thunar-volman tumbler xfwm4 xfwm4-themes xfconf xfdesktop4 \
-    xfce4-appfinder xfce4-panel fce4-power-manager xfce4-session xfce4-settings xfce4-terminal \
-    xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-pulseaudio-plugin xfce4-mount-plugin \
-    xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-xkb-plugin xfce4-sensors-plugin mousepad \
-    ristretto 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} exo garcon thunar thunar-volman tumbler xfwm4 xfwm4-themes xfconf xfdesktop \
+           xfce4-appfinder xfce4-panel xfce4-power-manager xfce4-session xfce4-settings xfce4-terminal \
+           xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-pulseaudio-plugin xfce4-mount-plugin \
+           xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-xkb-plugin xfce4-sensors-plugin mousepad \
+           ristretto 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install XFCE packages!"; exit 1; }
@@ -542,7 +540,7 @@ installation() {
   echo "127.0.1.1       ${HOSTNAME}.localdomain ${HOSTNAME}" >> ${TMPDIR}/etc/hosts
 
   # Enable users of group 'wheel' to execute any command.
-  sed -i 's/^# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/' \
+  sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' \
       ${TMPDIR}/etc/sudoers 1> /dev/null 2>&1
 
   # Check sed return value.
@@ -695,7 +693,7 @@ installation() {
   arch-chroot ${TMPDIR} systemctl enable ntpd 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
-  [[ $? == +(1|255) ]] && { clear; msg error "Failed toenable NTP daemon service!"; exit 1; }
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable NTP daemon service!"; exit 1; }
 
   msg log "Enabling the iwd service..."
   arch-chroot ${TMPDIR} systemctl enable iwd.service 1> /dev/null 2>&1
@@ -703,10 +701,10 @@ installation() {
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable iw daemon service!"; exit 1; }
 
-  msg log "Installing desktop environment..."
-  [[ ${ENVIRONMENT} == "Console" ]] && console_setup
-  [[ ${ENVIRONMENT} == "GNOME" ]] && common_desktop_setup && gnome_desktop_setup
-  [[ ${ENVIRONMENT} == "XFCE" ]] && common_desktop_setup && xfce_desktop_setup
+  msg log "Setup ${ENVIRONMENT} environment..."
+  [[ ${ENVIRONMENT} == "Console" ]] && { setup_console_environment; }
+  [[ ${ENVIRONMENT} == "GNOME" ]] && { setup_common_environment; setup_gnome_environment; }
+  [[ ${ENVIRONMENT} == "XFCE" ]] && { setup_common_environment; setup_xfce_environment; }
 
   msg log "Install complete"
 }
@@ -1122,7 +1120,7 @@ ENVIRONMENT=$(whiptail --clear --title "Arch Linux Installer" \
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { clear; msg info "Installation aborted..."; exit 1; }
 
-if [[ ${ENVIRONMENT} == "GNOME" ]]; then
+if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "XFCE" || ${ENVIRONMENT} == "KDE" ]]; then
   VIDEODRIVERS=($(whiptail --clear --title "Arch Linux Installer" \
     --checklist "Pick video drivers (press space):" 15 90 \
     $(bc <<< "${#VIDEODRIVERS[@]} / 3") "${VIDEODRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
