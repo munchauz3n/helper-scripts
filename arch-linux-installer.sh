@@ -2,7 +2,7 @@
 
 # Dependencies.
 declare -a DEPENDNECIES=(
-  "awk" "grep" "sed" "sgdisk" "lscpu" "lspci" "lsblk" "bc" "openssl" "wipefs"
+  "awk" "grep" "sed" "sfdisk" "sgdisk" "lscpu" "lspci" "lsblk" "bc" "openssl" "wipefs"
   "arch-chroot" "pacstrap" "genfstab" "whiptail" "mkfs.vfat" "mkfs.btrfs"
 )
 
@@ -25,6 +25,15 @@ declare -a ENVIRONMENTS=(
   "GNOME" "Modern and simple desktop - minimal installation" "off"
 #  "KDE" "Flashy desktop with many features - minimal installation" "off"
   "XFCE" "Reliable and fast desktop - minimal installation" "off"
+)
+
+# List of available display managers.
+declare -a DISPLAYMANAGERS=(
+  "GDM" "GNOME Display Manager" "off"
+  "SDDM" "Simple Desktop Display Manager. QML-based and successor to KDM" "off"
+  "LightDM(GTK)" "Light Display Manager with GTK greeter" "off"
+  "LightDM(slick)" "Light Display Manager with slick greeter" "off"
+  "LXDM" "Lightweight X11 Display Manager, does not support the XDMCP" "off"
 )
 
 # List of possible processor microcodes.
@@ -51,9 +60,9 @@ declare -a HWVIDEOACCELERATION=(
 
 # List of possible additional packages.
 declare -a EXTRAPKGS=(
-  "Touchpad" "Install for touchpad support via the synaptics driver" "off"
+  "Touchpad" "Install for touchpad support via the libinput driver" "off"
   "Touchscreen" "Install for touchscreen support via the libinput driver" "off"
-  "Wacom" "Install for Wacon stylus support" "off"
+  "Wacom" "Install for Wacom stylus support" "off"
 )
 
 declare DRIVE=""
@@ -74,6 +83,7 @@ declare FULLNAME=""
 declare USERGROUPS=""
 declare HOSTNAME="arhlinux"
 declare ENVIRONMENT=""
+declare DISPLAYMANAGER=""
 
 declare -a DEVICES=()
 declare DEVICE=""
@@ -397,49 +407,143 @@ setup_common_environment() {
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to install VA-API drivers for Haswell!"; exit 1; }
   fi
 
-  if [[ ${EXTRAPKGS[@]} == *"Touchpad"* ]]; then
-    msg log "Installing touchpad packages..."
-    pacstrap ${TMPDIR} xf86-input-synaptics 1> /dev/null 2>&1
-
-    # Check pacstrap return value.
-    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install touchpad packages!"; exit 1; }
-  fi
-
-  if [[ ${EXTRAPKGS[@]} == *"Touchscreen"* ]]; then
-    msg log "Installing touchscreen packages..."
+  if [[ ${EXTRAPKGS[@]} == *"Touchscreen"* || ${EXTRAPKGS[@]} == *"Touchpad"* ]]; then
+    msg log "Installing touchscreen/touchpad packages..."
     pacstrap ${TMPDIR} xf86-input-libinput 1> /dev/null 2>&1
 
     # Check pacstrap return value.
-    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install touchscreen packages!"; exit 1; }
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install touchscreen/touchpad packages!"; exit 1; }
   fi
 
   if [[ ${EXTRAPKGS[@]} == *"Wacom"* ]]; then
-    msg log "Installing Wacon packages..."
+    msg log "Installing Wacom packages..."
     pacstrap ${TMPDIR} xf86-input-wacom 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to install Wacom packages!"; exit 1; }
   fi
+
+  if [[ ${DISPLAYMANAGER} == "GDM" ]]; then
+    msg log "Installing GDM package..."
+    pacstrap ${TMPDIR} gdm 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install GDM package!"; exit 1; }
+
+    msg log "Enabling the GDM service..."
+    arch-chroot ${TMPDIR} systemctl enable gdm.service 1> /dev/null 2>&1
+
+    # Check arch-chroot return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable GDM service!"; exit 1; }
+  elif [[ ${DISPLAYMANAGER} == "SDDM" ]]; then
+    msg log "Installing SDDM package..."
+    pacstrap ${TMPDIR} gdm 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install SDDM package!"; exit 1; }
+
+    msg log "Enabling the SDDM service..."
+    arch-chroot ${TMPDIR} systemctl enable sddm.service 1> /dev/null 2>&1
+
+    # Check arch-chroot return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable SDDM service!"; exit 1; }
+  elif [[ ${DISPLAYMANAGER} == "LightDM(GTK)" || ${DISPLAYMANAGER} == "LightDM(slick)" ]]; then
+    msg log "Installing LightDM and greeter packages..."
+
+    if [[ ${DISPLAYMANAGER} == "LightDM(GTK)" ]]; then
+      pacstrap ${TMPDIR} lightdm lightdm-gtk-greeter lightdm-gtk-greeter-settings 1> /dev/null 2>&1
+
+      # Check pacstrap return value.
+      [[ $? == +(1|255) ]] && { clear; msg error "Failed to install LightDM packages!"; exit 1; }
+
+      # Setup the greeter to use.
+      sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-gtk-greeter/' \
+          ${TMPDIR}/etc/lightdm/lightdm.conf 1> /dev/null 2>&1;
+
+      # Configure a themes and background.
+      echo "[greeter]" > ${TMPDIR}/etc/lightdm/lightdm-gtk-greeter.conf
+      echo "theme-name = Adwaita-dark" >> ${TMPDIR}/etc/lightdm/lightdm-gtk-greeter.conf
+      echo "icon-theme-name = Adwaita" >> ${TMPDIR}/etc/lightdm/lightdm-gtk-greeter.conf
+
+      if [[ ${ENVIRONMENT} == "GNOME" ]]; then
+        echo "background = /usr/share/backgrounds/gnome/adwaita-d.webp" >> \
+            ${TMPDIR}/etc/lightdm/lightdm-gtk-greeter.conf
+      elif [[ ${ENVIRONMENT} == "XFCE" ]]; then
+        echo "background = /usr/share/backgrounds/xfce/xfce-shapes.svg" >> \
+            ${TMPDIR}/etc/lightdm/lightdm-gtk-greeter.conf
+      fi
+    elif [[ ${DISPLAYMANAGER} == "LightDM(slick)" ]]; then
+      pacstrap ${TMPDIR} lightdm lightdm-slick-greeter 1> /dev/null 2>&1\
+
+      # Check pacstrap return value.
+      [[ $? == +(1|255) ]] && { clear; msg error "Failed to install LightDM packages!"; exit 1; }
+
+      # Setup the greeter to use.
+      sed -i 's/#greeter-session=example-gtk-gnome/greeter-session=lightdm-slick-greeter/' \
+          ${TMPDIR}/etc/lightdm/lightdm.conf 1> /dev/null 2>&1;
+
+      # Configure background.
+      echo "[Greeter]" > ${TMPDIR}/etc/lightdm/slick-greeter.conf
+
+      if [[ ${ENVIRONMENT} == "GNOME" ]]; then
+        echo "background = /usr/share/backgrounds/gnome/adwaita-d.webp" >> \
+            ${TMPDIR}/etc/lightdm/slick-greeter.conf
+      elif [[ ${ENVIRONMENT} == "XFCE" ]]; then
+        echo "background = /usr/share/backgrounds/xfce/xfce-shapes.svg" >> \
+            ${TMPDIR}/etc/lightdm/slick-greeter.conf
+      fi
+    fi
+
+    msg log "Enabling the LightDM service..."
+    arch-chroot ${TMPDIR} systemctl enable lightdm.service 1> /dev/null 2>&1
+
+    # Check arch-chroot return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable LightDM service!"; exit 1; }
+  elif [[ ${DISPLAYMANAGER} == "LXDM" ]]; then
+    msg log "Installing LXDM package..."
+    pacstrap ${TMPDIR} lxdm-gtk3 librsvg 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to install LXDM package!"; exit 1; }
+
+    # Setup default session.
+    sed -i 's/# session=\/usr\/bin\/startlxde/session=\/usr\/bin\/startlxde/' \
+        ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+
+    if [[ ${ENVIRONMENT} == "GNOME" ]]; then
+      sed -i 's/startlxde/gnome-session/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    elif [[ ${ENVIRONMENT} == "KDE" ]]; then
+      sed -i 's/startlxde/startplasma-x11/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    elif [[ ${ENVIRONMENT} == "XFCE" ]]; then
+      sed -i 's/startlxde/startxfce4/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    fi
+
+    # Disable user list.
+    sed -i 's/^disable=0/disable=1/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    # Change the theme.
+    sed -i 's/^gtk_theme=Adwaita/gtk_theme=Adwaita-dark/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    # Place .Xauthority in /tmp.
+    sed -i 's/^# xauth_path=\/tmp/xauth_path=\/tmp/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+    # Disable language select control.
+    sed -i 's/^lang=1/lang=0/' ${TMPDIR}/etc/lxdm/lxdm.conf 1> /dev/null 2>&1;
+
+    msg log "Enabling the LXDM service..."
+    arch-chroot ${TMPDIR} systemctl enable lxdm.service 1> /dev/null 2>&1
+
+    # Check arch-chroot return value.
+    [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable LXDM service!"; exit 1; }
+  fi
 }
 
 setup_gnome_environment() {
   msg log "Installing GNOME packages..."
-  pacstrap ${TMPDIR} baobab eog evince file-roller gdm gedit gnome-backgrounds \
+  pacstrap ${TMPDIR} baobab eog evince file-roller gedit gnome-backgrounds \
            gnome-calculator gnome-calendar gnome-clocks gnome-control-center gnome-logs gnome-menus \
            gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
            gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth \
-           gnome-icon-theme-extras gnome-software xdg-user-dirs mutter nautilus sushi gvfs yelp guake \
+           gnome-icon-theme-extras gnome-software gnome-keyring mutter nautilus sushi gvfs yelp guake \
            pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
-
-  # Check pacstrap return value.
-  [[ $? == +(1|255) ]] && { clear; msg error "Failed to install GNOME packages!"; exit 1; }
-
-  msg log "Enabling the GDM service..."
-  arch-chroot ${TMPDIR} systemctl enable gdm.service 1> /dev/null 2>&1
-
-  # Check arch-chroot return value.
-  [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable GDM service!"; exit 1; }
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
@@ -460,24 +564,41 @@ setup_gnome_environment() {
 
 setup_xfce_environment() {
   msg log "Installing XFCE packages..."
-  pacstrap ${TMPDIR} exo garcon thunar thunar-volman tumbler xfwm4 xfwm4-themes xfconf xfdesktop \
-           xfce4-appfinder xfce4-panel xfce4-power-manager xfce4-session xfce4-settings xfce4-terminal \
-           xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-pulseaudio-plugin xfce4-mount-plugin \
-           xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-xkb-plugin xfce4-sensors-plugin mousepad \
-           ristretto 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} exo garcon mousepad thunar thunar-volman tumbler xfwm4 xfwm4-themes ristretto \
+           xfce4-appfinder xfce4-panel xfce4-power-manager xfce4-session xfce4-pulseaudio-plugin \
+           xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-xkb-plugin xfce4-mount-plugin \
+           xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-sensors-plugin xfce4-settings \
+           xfce4-terminal xfce4-screensaver pulseaudio pavucontrol xfdesktop xfconf networkmanager \
+           network-manager-applet 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install XFCE packages!"; exit 1; }
+
+  msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
+  echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
+  echo "wifi.backend=iwd" >> ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
+
+  msg log "Disabling the wpa_supplicant service..."
+  arch-chroot ${TMPDIR} systemctl disable wpa_supplicant.service 1> /dev/null 2>&1
+
+  # Check arch-chroot return value.
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to disable wpa_suplicant service!"; exit 1; }
+
+  msg log "Enabling the NetworkManager service..."
+  arch-chroot ${TMPDIR} systemctl enable NetworkManager.service 1> /dev/null 2>&1
+
+  # Check arch-chroot return value.
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
 installation() {
   msg info "Creating installation..."
 
   msg log "Installing base packages..."
-  pacstrap ${TMPDIR} base base-devel linux linux-firmware util-linux usbutils man-db man-pages \
-           texinfo bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub \
-           efibootmgr btrfs-progs acpi lm_sensors ntp dbus alsa-utils cronie terminus-font \
-           ttf-dejavu ttf-liberation ntfs-3g 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} base base-devel linux linux-firmware util-linux usbutils man-db man-pages texinfo \
+           bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr acpi \
+           btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu ttf-liberation \
+           ntfs-3g libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install base packages!"; exit 1; }
@@ -758,8 +879,8 @@ CONFIGURATION+="  Drive = ${DRIVE}\n"
 
 # -----------------------------------------------------------------------------
 # Find out the total disk size (GiB).
-FREESPACE=$(sgdisk -p ${DRIVE} | awk '/Sector size/ { print $4 }' | awk -F'/' '{ print $1 }')
-FREESPACE=$(bc <<< "$(sgdisk -p ${DRIVE} | awk '/last usable sector/ { print $10 }') * ${FREESPACE}")
+FREESPACE=$(sfdisk -l ${DRIVE} | awk '/Sector size/ { print $4 }' | awk -F'/' '{ print $1 }')
+FREESPACE=$(bc <<< "($(sfdisk -l ${DRIVE} | awk '/sectors$/ { print $7 }') - 2048) * ${FREESPACE}")
 FREESPACE=$(bc <<< "${FREESPACE} / 1024^2")
 
 EFISIZE=$(whiptail --clear --title "Arch Linux Installer" \
@@ -778,7 +899,7 @@ EFISIZE=$(whiptail --clear --title "Arch Linux Installer" \
 if [[ ! "${EFISIZE}" =~ ^[0-9]+$ ]]; then
   clear; msg error "EFI size contains invalid characters."; exit 1
 elif [[ ${EFISIZE} -gt ${FREESPACE} ]]; then
-  clear; msg "Choosen EFI size is more than the available free space!"; exit 1
+  clear; msg error "Choosen EFI size is more than the available free space!"; exit 1
 fi
 
 # Update free space size.
@@ -825,7 +946,7 @@ SWAPSIZE=$(whiptail --clear --title "Arch Linux Installer" \
 if [[ ! "${SWAPSIZE}" =~ ^[0-9]+$ ]]; then
   clear; msg error "SWAP size contains invalid characters."; exit 1
 elif [[ ${SWAPSIZE} -gt ${FREESPACE} ]]; then
-  clear; msg "Choosen SWAP size is more than the available free space!"; exit 1
+  clear; msg error "Choosen SWAP size is more than the available free space!"; exit 1
 fi
 
 # Update free space size.
@@ -870,7 +991,7 @@ SYSTEMSIZE=$(whiptail --clear --title "Arch Linux Installer" --inputbox \
 if [[ ! "${SYSTEMSIZE}" =~ ^[0-9]+$ ]]; then
   clear; msg error "SYSTEM size contains invalid characters."; exit 1
 elif [[ ${SYSTEMSIZE} -gt ${FREESPACE} ]]; then
-  clear; msg "Choosen SYSTEM size is more than the available free space!"; exit 1
+  clear; msg error "Choosen SYSTEM size is more than the available free space!"; exit 1
 fi
 
 [ ${SYSTEMSIZE} -eq 0 ] && CONFIGURATION+="  SYSTEM partition size = ${FREESPACE} (MiB)\n"
@@ -1120,7 +1241,19 @@ ENVIRONMENT=$(whiptail --clear --title "Arch Linux Installer" \
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { clear; msg info "Installation aborted..."; exit 1; }
 
-if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "XFCE" || ${ENVIRONMENT} == "KDE" ]]; then
+if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == "XFCE" ]]; then
+  # Enable the default manager based on the chosen environment.
+  [[ ${ENVIRONMENT} == "GNOME" ]] && { DISPLAYMANAGERS[2]="on"; }
+  [[ ${ENVIRONMENT} == "KDE" ]] && { DISPLAYMANAGERS[5]="on"; }
+  [[ ${ENVIRONMENT} == "XFCE" ]] && { DISPLAYMANAGERS[8]="on"; }
+
+  DISPLAYMANAGER=$(whiptail --clear --title "Arch Linux Installer" \
+    --radiolist "Pick  display manager (press space):" 15 90 \
+    $(bc <<< "${#DISPLAYMANAGERS[@]} / 3") "${DISPLAYMANAGERS[@]}" 3>&1 1>&2 2>&3 3>&-)
+
+  # Check whiptail window return value.
+  [[ $? == +(1|255) ]] && { clear; msg info "Installation aborted..."; exit 1; }
+
   VIDEODRIVERS=($(whiptail --clear --title "Arch Linux Installer" \
     --checklist "Pick video drivers (press space):" 15 90 \
     $(bc <<< "${#VIDEODRIVERS[@]} / 3") "${VIDEODRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
