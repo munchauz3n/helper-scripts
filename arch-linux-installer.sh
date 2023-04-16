@@ -97,8 +97,7 @@ msg() {
     ['error']='red'
     ['warning']='yellow'
     ['info']='green'
-    ['debug']='blue'
-    ['verbose']='cyan'
+    ['log']='blue'
   )
   declare -A colors=(
     ['black']='\E[1;47m'
@@ -121,9 +120,7 @@ msg() {
 
   if [[ ${type} == "info" ]]; then
     printf "${color}==>${default}${bold} ${message}${default}\n" "$@" >&2
-  elif [[ ${type} == "debug" ]]; then
-    printf "${color}  ->${default}${bold} ${message}${default}\n" "$@" >&2
-  elif [[ ${type} == "verbose" ]]; then
+  elif [[ ${type} == "log" ]]; then
     printf "${color}  ->${default}${bold} ${message}${default}\n" "$@" >&2
   elif [[ ${type} == "warning" ]]; then
     printf "${color}==>WARNING:${default}${bold} ${message}${default}\n" "$@" >&2
@@ -137,14 +134,14 @@ prepare() {
   local partitions=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
 
   for partition in ${partitions[@]}; do
-    msg debug "umount partition /dev/${partition} ..."
+    msg log "umount partition /dev/${partition} ..."
     umount /dev/${partition} 1> /dev/null 2>&1
 
     # Check umount return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to umount previous partition!"; exit 1; }
   done
 
-  msg debug "Removing any lingering information from previous partitions..."
+  msg log "Removing any lingering information from previous partitions..."
   sgdisk --zap-all ${DRIVE} 1> /dev/null 2>&1
 
   # Check sgdisk return value.
@@ -155,7 +152,7 @@ prepare() {
   # Check wipefs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to wipe filesystem!"; exit 1; }
 
-  msg debug "Creating partition table..."
+  msg log "Creating partition table..."
   sgdisk --clear \
        --new=1:0:+${EFISIZE}MiB    --typecode=1:ef00 --change-name=1:EFI \
        --new=2:0:+${SWAPSIZE}MiB   --typecode=2:8200 --change-name=2:cryptswap \
@@ -167,53 +164,53 @@ prepare() {
 
   partitions=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
 
-  msg debug "Encrypting Swap partition..."
+  msg log "Encrypting Swap partition..."
   echo -n "${SWAPPASSWORD}" | cryptsetup luksFormat --align-payload=8192 \
                                          /dev/${partitions[1]} - 1> /dev/null 2>&1
   echo -n "${SWAPPASSWORD}" | cryptsetup open /dev/${partitions[1]} swap - \
                                          1> /dev/null 2>&1
 
-  msg debug "Initializing Swap partition..."
+  msg log "Initializing Swap partition..."
   mkswap -L swap /dev/mapper/swap 1> /dev/null 2>&1
   swapon -L swap 1> /dev/null 2>&1
 
-  msg debug "Encrypting System partition..."
+  msg log "Encrypting System partition..."
   echo -n "${SYSTEMPASSWORD}" | cryptsetup luksFormat --type luks1 --iter-time 5000 \
                                            --align-payload=8192 /dev/${partitions[2]} - \
                                            1> /dev/null 2>&1
   echo -n "${SYSTEMPASSWORD}" | cryptsetup open /dev/${partitions[2]} system - 1> /dev/null 2>&1
 
-  msg debug "Creating and mounting System BTRFS Subvolumes..."
+  msg log "Creating and mounting System BTRFS Subvolumes..."
   mkfs.btrfs --force --label system /dev/mapper/system  1> /dev/null 2>&1
 
   # Check mkfs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to create system volume!"; exit 1; }
 
-  msg verbose "Mount system volume..."
+  msg log "Mount system volume..."
   mount -t btrfs LABEL=system ${TMPDIR}  1> /dev/null 2>&1
 
   # Check mount return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to mount system volume!"; exit 1; }
 
-  msg verbose "Create root subvolume..."
+  msg log "Create root subvolume..."
   btrfs subvolume create ${TMPDIR}/root  1> /dev/null 2>&1
 
   # Check btrfs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to create root subvolume!"; exit 1; }
 
-  msg verbose "Create home subvolume..."
+  msg log "Create home subvolume..."
   btrfs subvolume create ${TMPDIR}/home  1> /dev/null 2>&1
 
   # Check btrfs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to create home subvolume!"; exit 1; }
 
-  msg verbose "Create snapshots subvolume..."
+  msg log "Create snapshots subvolume..."
   btrfs subvolume create ${TMPDIR}/snapshots  1> /dev/null 2>&1
 
   # Check btrfs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to create snapshosts subvolume!"; exit 1; }
 
-  msg verbose "Umount system volume..."
+  msg log "Umount system volume..."
   umount -R ${TMPDIR}  1> /dev/null 2>&1
 
   # Check umount return value.
@@ -221,31 +218,31 @@ prepare() {
 
   local options="defaults,x-mount.mkdir,compress=lzo,ssd,noatime"
 
-  msg verbose "Mount root subvolume..."
+  msg log "Mount root subvolume..."
   mount -t btrfs -o subvol=root,${options} LABEL=system ${TMPDIR}  1> /dev/null 2>&1
 
   # Check mount return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to mount root subvolume!"; exit 1; }
 
-  msg verbose "Mount home subvolume..."
+  msg log "Mount home subvolume..."
   mount -t btrfs -o subvol=home,${options} LABEL=system ${TMPDIR}/home  1> /dev/null 2>&1
 
   # Check mount return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to mount home subvolume!"; exit 1; }
 
-  msg verbose "Mount snapshots subvolume..."
+  msg log "Mount snapshots subvolume..."
   mount -t btrfs -o subvol=snapshots,${options} LABEL=system ${TMPDIR}/.snapshots  1> /dev/null 2>&1
 
   # Check mount return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to mount snapshots subvolume!"; exit 1; }
 
-  msg debug "Formating EFI partition..."
+  msg log "Formating EFI partition..."
   mkfs.vfat  /dev/${partitions[0]} -F 32 -n EFI 1> /dev/null 2>&1
 
   # Check mkfs return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to format EFI partition!"; exit 1; }
 
-  msg debug "Mounting EFI partition..."
+  msg log "Mounting EFI partition..."
   mkdir ${TMPDIR}/efi  1> /dev/null 2>&1
   mount /dev/${partitions[0]} ${TMPDIR}/efi 1> /dev/null 2>&1
 
@@ -256,23 +253,23 @@ prepare() {
   CRYPTSWAP="/dev/${partitions[1]}"
   CRYPTSYSTEM="/dev/${partitions[2]}"
 
-  msg debug "Done"
+  msg log "Done"
 }
 
 console_setup() {
-  msg debug "Installing ACPI daemon..."
+  msg log "Installing ACPI daemon..."
   pacstrap ${TMPDIR} acpid 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install ACPI daemon!"; exit 1; }
 
-  msg debug "Enabling ACPI daemon service..."
+  msg log "Enabling ACPI daemon service..."
   arch-chroot ${TMPDIR} systemctl enable acpid.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable ACPI service!"; exit 1; }
 
-  msg debug "Enabling volume/mic controls in /etc/acpi/events/ ..."
+  msg log "Enabling volume/mic controls in /etc/acpi/events/ ..."
   msg warning "Disable volume/mic controls in Xorg to prevent conflicts!"
 
   echo "event=button/volumeup" > ${TMPDIR}/etc/acpi/events/vol-up
@@ -287,7 +284,7 @@ console_setup() {
   echo "event=button/f20" > ${TMPDIR}/etc/acpi/events/mic-mute
   echo "action=amixer set Capture toggle" >> ${TMPDIR}/etc/acpi/events/mic-mute
 
-  msg debug "Setting wired and wireless DHCP configurations..."
+  msg log "Setting wired and wireless DHCP configurations..."
 	cat <<-__EOF__ > ${TMPDIR}/etc/systemd/network/99-ethernet.network
 		[Match]
 		Name=en*
@@ -314,13 +311,13 @@ console_setup() {
 		RouteMetric=1024
 	__EOF__
 
-  msg debug "Enabling networkd service..."
+  msg log "Enabling networkd service..."
   arch-chroot ${TMPDIR} systemctl enable systemd-networkd.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable network daemon service!"; exit 1; }
 
-  msg debug "Enabling resolved service..."
+  msg log "Enabling resolved service..."
   arch-chroot ${TMPDIR} systemctl enable systemd-resolved.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
@@ -328,19 +325,19 @@ console_setup() {
 }
 
 common_desktop_setup() {
-  msg debug "Installing Xorg display server and xinitrc..."
+  msg log "Installing Xorg display server and xinitrc..."
   pacstrap ${TMPDIR} xorg-server xorg-xinit 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install xorg and xinitrc!"; exit 1; }
 
-  msg debug "Installing Xorg relates packages..."
-  pacstrap ${TMPDIR} xorg-xset xorg-xprop xorg-xrandr xorg-xclock  xdg-utils 1> /dev/null 2>&1
+  msg log "Installing Xorg relates packages..."
+  pacstrap ${TMPDIR} xorg-xset xorg-xprop xorg-xrandr xorg-xclock xdg-utils 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install xorg relatd packages!"; exit 1; }
 
-  msg debug "Installing video drivers..."
+  msg log "Installing video drivers..."
   pacstrap ${TMPDIR} xf86-video-vesa 1> /dev/null 2>&1
 
   # Check pacstrap return value.
@@ -355,7 +352,7 @@ common_desktop_setup() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install video drivers!"; exit 1; }
 
   if [[ ${VIDEODRIVERS[@]} == *"AMD"* ]]; then
-    msg debug "Installing Vulkan drivers for AMD..."
+    msg log "Installing Vulkan drivers for AMD..."
     pacstrap ${TMPDIR} vulkan-icd-loader vulkan-radeon 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -363,7 +360,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${VIDEODRIVERS[@]} == *"Intel"* ]]; then
-    msg debug "Installing Vulkan drivers for Intel..."
+    msg log "Installing Vulkan drivers for Intel..."
     pacstrap ${TMPDIR} vulkan-icd-loader vulkan-intel 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -371,7 +368,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Mesa VA-API"* ]]; then
-    msg debug "Installing Mesa VA-API drivers..."
+    msg log "Installing Mesa VA-API drivers..."
     pacstrap ${TMPDIR} libva-mesa-driver 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -379,7 +376,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Mesa VDPAU"* ]]; then
-    msg debug "Installing Mesa VDPAU drivers..."
+    msg log "Installing Mesa VDPAU drivers..."
     pacstrap ${TMPDIR} mesa-vdpau 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -387,7 +384,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Intel VA-API(>= Broadwell)"* ]]; then
-    msg debug "Installing Intel VA-API drivers for Broadwell and newer graphics..."
+    msg log "Installing Intel VA-API drivers for Broadwell and newer graphics..."
     pacstrap ${TMPDIR} intel-media-driver 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -395,7 +392,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Intel VA-API(<= Haswell)"* ]]; then
-    msg debug "Installing Intel VA-API drivers for Haswell and older graphics..."
+    msg log "Installing Intel VA-API drivers for Haswell and older graphics..."
     pacstrap ${TMPDIR} libva-intel-driver 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -403,7 +400,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${EXTRAPKGS[@]} == *"Touchpad"* ]]; then
-    msg debug "Installing touchpad packages..."
+    msg log "Installing touchpad packages..."
     pacstrap ${TMPDIR} xf86-input-synaptics 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -411,7 +408,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${EXTRAPKGS[@]} == *"Touchscreen"* ]]; then
-    msg debug "Installing touchscreen packages..."
+    msg log "Installing touchscreen packages..."
     pacstrap ${TMPDIR} xf86-input-libinput 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -419,7 +416,7 @@ common_desktop_setup() {
   fi
 
   if [[ ${EXTRAPKGS[@]} == *"Wacom"* ]]; then
-    msg debug "Installing Wacon packages..."
+    msg log "Installing Wacon packages..."
     pacstrap ${TMPDIR} xf86-input-wacom 1> /dev/null 2>&1
 
     # Check pacstrap return value.
@@ -428,7 +425,7 @@ common_desktop_setup() {
 }
 
 gnome_desktop_setup() {
-  msg debug "Installing GNOME packages..."
+  msg log "Installing GNOME packages..."
   pacstrap ${TMPDIR} baobab eog evince file-roller gdm gedit gnome-backgrounds \
            gnome-calculator gnome-calendar gnome-clocks gnome-control-center gnome-logs gnome-menus \
            gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
@@ -440,23 +437,23 @@ gnome_desktop_setup() {
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install GNOME packages!"; exit 1; }
 
-  msg debug "Enabling the GDM service..."
+  msg log "Enabling the GDM service..."
   arch-chroot ${TMPDIR} systemctl enable gdm.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable GDM service!"; exit 1; }
 
-  msg debug "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
+  msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
   echo "wifi.backend=iwd" >> ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
 
-  msg debug "Disabling the wpa_supplicant service..."
+  msg log "Disabling the wpa_supplicant service..."
   arch-chroot ${TMPDIR} systemctl disable wpa_supplicant.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to disable wpa_suplicant service!"; exit 1; }
 
-  msg debug "Enabling the NetworkManager service..."
+  msg log "Enabling the NetworkManager service..."
   arch-chroot ${TMPDIR} systemctl enable NetworkManager.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
@@ -464,7 +461,7 @@ gnome_desktop_setup() {
 }
 
 xfce_desktop_setup() {
-  msg debug "Installing XFCE packages..."
+  msg log "Installing XFCE packages..."
   pacstrap ${TMPDIR} exo garcon thunar thunar-volman tumbler xfwm4 xfwm4-themes xfconf xfdesktop4 \
     xfce4-appfinder xfce4-panel fce4-power-manager xfce4-session xfce4-settings xfce4-terminal \
     xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-pulseaudio-plugin xfce4-mount-plugin \
@@ -478,7 +475,7 @@ xfce_desktop_setup() {
 installation() {
   msg info "Creating installation..."
 
-  msg debug "Installing base packages..."
+  msg log "Installing base packages..."
   pacstrap ${TMPDIR} base base-devel linux linux-firmware util-linux usbutils man-db man-pages \
            texinfo bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub \
            efibootmgr btrfs-progs acpi lm_sensors ntp dbus alsa-utils cronie terminus-font \
@@ -495,13 +492,13 @@ installation() {
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install microcodes!"; exit 1; }
 
-  msg debug "Generate fstab..."
+  msg log "Generate fstab..."
   genfstab -L -p ${TMPDIR} >> ${TMPDIR}/etc/fstab
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to generate fstab!"; exit 1; }
 
-  msg debug "Setting password for root..."
+  msg log "Setting password for root..."
   awk -i inplace -F: "BEGIN {OFS=FS;} \
       \$1 == \"root\" {\$2=\"$(openssl passwd -6 ${ROOTPASSWORD})\"} 1" \
       ${TMPDIR}/etc/shadow 1> /dev/null 2>&1
@@ -509,20 +506,20 @@ installation() {
   # Check awk return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to configure the root password!"; exit 1; }
 
-  msg debug "Set timezone, locales, keyboard, fonts and hostname..."
+  msg log "Set timezone, locales, keyboard, fonts and hostname..."
   arch-chroot ${TMPDIR} ln -sf /usr/share/zoneinfo/"${TIMEZONE}" \
                                /etc/localtime 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to set time zone!"; exit 1; }
 
-  msg verbose "Set hardware clock..."
+  msg log "Set hardware clock..."
   arch-chroot ${TMPDIR} hwclock --systohc 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to set HW clock!"; exit 1; }
 
-  msg verbose "Setting locales..."
+  msg log "Setting locales..."
   for locale in "${LOCALES[@]//\"}"; do
     sed -i s/"#${locale}"/"${locale}"/g ${TMPDIR}/etc/locale.gen 1> /dev/null 2>&1
 
@@ -552,14 +549,14 @@ installation() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to add group 'wheel' to sudoers!"; exit 1; }
 
   if [ ! -z ${USERNAME} ]; then
-    msg debug "Setting user ${USERNAME}..."
+    msg log "Setting user ${USERNAME}..."
     arch-chroot ${TMPDIR} useradd -m -G wheel,storage,optical,scanner \
                                   -s /bin/bash ${USERNAME} 1> /dev/null 2>&1
 
     # Check arch-chroot return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to add user!"; exit 1; }
 
-    msg verbose "Setting password for user ${USERNAME} ..."
+    msg log "Setting password for user ${USERNAME} ..."
     awk -i inplace -F: "BEGIN {OFS=FS;} \
         \$1 == \"${USERNAME}\" {\$2=\"$(openssl passwd -6 ${PASSWORD})\"} 1" \
         ${TMPDIR}/etc/shadow 1> /dev/null 2>&1
@@ -567,20 +564,20 @@ installation() {
     # Check awk return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to configure the user password!"; exit 1; }
 
-    msg verbose "Adding groups '${USERGROUPS}' to user '${USERNAME}'..."
+    msg log "Adding groups '${USERGROUPS}' to user '${USERNAME}'..."
     arch-chroot ${TMPDIR} usermod -aG ${USERGROUPS} ${USERNAME} 1> /dev/null 2>&1
 
     # Check arch-chroot return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to modify user groups!"; exit 1; }
 
-    msg verbose "Set fullname for '${USERNAME}'..."
+    msg log "Set fullname for '${USERNAME}'..."
     arch-chroot ${TMPDIR} chfn -f "${FULLNAME}" ${USERNAME} 1> /dev/null 2>&1
 
     # Check arch-chroot return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to set full name!"; exit 1; }
   fi
 
-  msg debug "Configuring initramfs..."
+  msg log "Configuring initramfs..."
 
   # The btrfs-check tool cannot be used on a mounted file system. To be able
   # to use btrfs-check without booting from a live USB, add it BINARIES.
@@ -617,7 +614,7 @@ installation() {
   sed -i "s/^MODULES=\(.*\)/MODULES=\(${module}\)/g" \
       ${TMPDIR}/etc/mkinitcpio.conf 1> /dev/null 2>&1
 
-  msg debug "Configuring GRUB..."
+  msg log "Configuring GRUB..."
 
   local cmdline="${KERNELPARAMS[@]//\"}"
   sed -i "/^GRUB_CMDLINE_LINUX=/ s/\(.*\)\"/\1${cmdline}\"/" \
@@ -644,7 +641,7 @@ installation() {
   # Restruct /boot permissions.
   chmod 700 ${TMPDIR}/boot
 
-  msg debug "Creating crypt keys..."
+  msg log "Creating crypt keys..."
 
   local cryptdir="/etc/cryptsetup-keys.d"
   mkdir ${TMPDIR}${cryptdir} && chmod 700 ${TMPDIR}${cryptdir} 1> /dev/null 2>&1
@@ -675,43 +672,43 @@ installation() {
   sed -i "/^GRUB_CMDLINE_LINUX=/ s/\(.*\)\"/\1 ${cmdline//\//\\/}\"/" \
       ${TMPDIR}/etc/default/grub 1> /dev/null 2>&1
 
-  msg debug "Recreate initramfs..."
+  msg log "Recreate initramfs..."
   arch-chroot ${TMPDIR} mkinitcpio -P 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to recreate initramfs!"; exit 1; }
 
-  msg debug "Installing GRUB in /efi..."
+  msg log "Installing GRUB in /efi..."
   arch-chroot ${TMPDIR} grub-install --target=x86_64-efi --efi-directory=/efi \
                                      --bootloader-id=GRUB --recheck 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install GRUB!"; exit 1; }
 
-  msg debug "Creating GRUB configuration file..."
+  msg log "Creating GRUB configuration file..."
   arch-chroot ${TMPDIR} grub-mkconfig -o /boot/grub/grub.cfg 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to create GRUB configuration!"; exit 1; }
 
-  msg debug "Enabling NTP(Network Time Protocol) daemon service..."
+  msg log "Enabling NTP(Network Time Protocol) daemon service..."
   arch-chroot ${TMPDIR} systemctl enable ntpd 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed toenable NTP daemon service!"; exit 1; }
 
-  msg debug "Enabling the iwd service..."
+  msg log "Enabling the iwd service..."
   arch-chroot ${TMPDIR} systemctl enable iwd.service 1> /dev/null 2>&1
 
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable iw daemon service!"; exit 1; }
 
-  msg debug "Installing desktop environment..."
+  msg log "Installing desktop environment..."
   [[ ${ENVIRONMENT} == "Console" ]] && console_setup
   [[ ${ENVIRONMENT} == "GNOME" ]] && common_desktop_setup && gnome_desktop_setup
   [[ ${ENVIRONMENT} == "XFCE" ]] && common_desktop_setup && xfce_desktop_setup
 
-  msg debug "Install complete"
+  msg log "Install complete"
 }
 
 cleanup() {
@@ -719,7 +716,7 @@ cleanup() {
 
   umount -R ${TMPDIR}
 
-  msg debug "Done"
+  msg log "Done"
 }
 
 
