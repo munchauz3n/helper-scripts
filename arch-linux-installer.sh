@@ -571,8 +571,7 @@ setup_kde_environment() {
            kdeplasma-addons kgamma kinfocenter plasma-browser-integration plasma-thunderbolt drkonqi \
            discover plasma-systemmonitor plasma-vault plasma-workspace-wallpapers 1> /dev/null 2>&1
 
-  if [[ ${DISPLAYMANAGER} == "SDDM" ]]; then
-    pacstrap ${TMPDIR} sddm-kcm 1> /dev/null 2>&1
+  [[ ${DISPLAYMANAGER} == "SDDM" ]] && pacstrap ${TMPDIR} sddm-kcm 1> /dev/null 2>&1
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
