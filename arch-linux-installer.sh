@@ -23,7 +23,7 @@ declare -a KERNELPARAMS=(
 declare -a ENVIRONMENTS=(
   "Console" "Bare console environment" "on"
   "GNOME" "Modern and simple desktop - minimal installation" "off"
-#  "KDE" "Flashy desktop with many features - minimal installation" "off"
+  "KDE" "Flashy desktop with many features - minimal installation" "off"
   "XFCE" "Reliable and fast desktop - minimal installation" "off"
 )
 
@@ -340,7 +340,7 @@ setup_common_environment() {
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install xorg and xinitrc!"; exit 1; }
 
   msg log "Installing Xorg relates packages..."
-  pacstrap ${TMPDIR} xorg-xset xorg-xprop xorg-xrandr xorg-xclock xdg-utils 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} xorg-xset xorg-xprop xorg-xrandr xdg-utils 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install xorg relatd packages!"; exit 1; }
@@ -543,7 +543,31 @@ setup_gnome_environment() {
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
            gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth \
            gnome-icon-theme-extras gnome-software gnome-keyring mutter nautilus sushi gvfs yelp guake \
-           pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
+           pulseaudio networkmanager 1> /dev/null 2>&1
+
+  msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
+  echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
+  echo "wifi.backend=iwd" >> ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
+
+  msg log "Disabling the wpa_supplicant service..."
+  arch-chroot ${TMPDIR} systemctl disable wpa_supplicant.service 1> /dev/null 2>&1
+
+  # Check arch-chroot return value.
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to disable wpa_suplicant service!"; exit 1; }
+
+  msg log "Enabling the NetworkManager service..."
+  arch-chroot ${TMPDIR} systemctl enable NetworkManager.service 1> /dev/null 2>&1
+
+  # Check arch-chroot return value.
+  [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable NetworkManager service!"; exit 1; }
+}
+
+setup_kde_environment() {
+  msg log "Installing KDE packages..."
+  pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-firewall \
+           plasma-wayland-protocols plasma-disks kscreen dolphin konsole breeze oxygen powerdevil \
+           kde-gtk-config pulseaudio networkmanager yakuake kate bluedevil ark qalculate-qt \
+           kdialog kwalletmanager kweather kcron ksystemlog kjournald sweeper 1> /dev/null 2>&1
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
@@ -598,7 +622,7 @@ installation() {
   pacstrap ${TMPDIR} base base-devel linux linux-firmware util-linux usbutils man-db man-pages texinfo \
            bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr acpi \
            btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu ttf-liberation \
-           ntfs-3g libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
+           grub-btrfs inotify-tools timeshift ntfs-3g libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { clear; msg error "Failed to install base packages!"; exit 1; }
@@ -825,6 +849,7 @@ installation() {
   msg log "Setup ${ENVIRONMENT} environment..."
   [[ ${ENVIRONMENT} == "Console" ]] && { setup_console_environment; }
   [[ ${ENVIRONMENT} == "GNOME" ]] && { setup_common_environment; setup_gnome_environment; }
+  [[ ${ENVIRONMENT} == "KDE" ]] && { setup_common_environment; setup_kde_environment; }
   [[ ${ENVIRONMENT} == "XFCE" ]] && { setup_common_environment; setup_xfce_environment; }
 
   msg log "Install complete"
