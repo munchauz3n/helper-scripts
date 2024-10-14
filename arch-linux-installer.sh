@@ -437,7 +437,7 @@ setup_common_environment() {
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to enable GDM service!"; exit 1; }
   elif [[ ${DISPLAYMANAGER} == "SDDM" ]]; then
     msg log "Installing SDDM package..."
-    pacstrap ${TMPDIR} gdm 1> /dev/null 2>&1
+    pacstrap ${TMPDIR} sddm 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { clear; msg error "Failed to install SDDM package!"; exit 1; }
@@ -543,7 +543,7 @@ setup_gnome_environment() {
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
            gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth \
            gnome-icon-theme-extras gnome-software gnome-keyring mutter nautilus sushi gvfs yelp guake \
-           pulseaudio networkmanager 1> /dev/null 2>&1
+           pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
@@ -566,8 +566,13 @@ setup_kde_environment() {
   msg log "Installing KDE packages..."
   pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-firewall \
            plasma-wayland-protocols plasma-disks kscreen dolphin konsole breeze oxygen powerdevil \
-           kde-gtk-config pulseaudio networkmanager yakuake kate bluedevil ark qalculate-qt \
-           kdialog kwalletmanager kweather kcron ksystemlog kjournald sweeper 1> /dev/null 2>&1
+           kde-gtk-config pulseaudio pavucontrol networkmanager yakuake kate bluedevil ark kdialog \
+           qalculate-qt kwalletmanager kweather kcron ksystemlog kjournald kdeconnect sweeper \
+           kdeplasma-addons kgamma kinfocenter plasma-browser-integration plasma-thunderbolt drkonqi \
+           discover plasma-systemmonitor plasma-vault plasma-workspace-wallpapers 1> /dev/null 2>&1
+
+  if [[ ${DISPLAYMANAGER} == "SDDM" ]]; then
+    pacstrap ${TMPDIR} sddm-kcm 1> /dev/null 2>&1
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
