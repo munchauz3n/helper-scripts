@@ -638,7 +638,7 @@ setup_gnome_environment() {
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
            gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth-3.0 \
            gnome-icon-theme-extras gnome-software gnome-keyring mutter nautilus sushi gvfs yelp guake \
-           pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
+           power-profiles-daemon pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install GNOME packages!"; exit 1; }
@@ -668,7 +668,7 @@ setup_kde_environment() {
            kate ark kwalletmanager kweather kcron ksystemlog kjournald kdeconnect sweeper \
            kdeplasma-addons kgamma kinfocenter plasma-browser-integration plasma-thunderbolt \
            drkonqi plasma-systemmonitor plasma-vault plasma-workspace-wallpapers kdialog \
-           powerdevil bluedevil discover qalculate-qt 1> /dev/null 2>&1
+           power-profiles-daemon powerdevil bluedevil discover qalculate-qt 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install KDE packages!"; exit 1; }
