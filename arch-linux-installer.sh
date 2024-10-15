@@ -735,7 +735,7 @@ installation() {
            bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr \
            btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu texinfo \
            ttf-liberation acpi grub-btrfs inotify-tools timeshift ntfs-3g git btop rocm-smi-lib \
-           fwupd bc dosfstools libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
+           fwupd bc dosfstools os-prober libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install base packages!"; exit 1; }
@@ -909,7 +909,7 @@ installation() {
 
   if [ ! -z ${SWAPPASSWORD} ] || [ ! -z ${SYSTEMPASSWORD} ]; then
     # Configure GRUB to allow booting from /boot on a LUKS1 encrypted partition.
-    sed -i s/"^#GRUB_ENABLE_CRYPTODISK=y"/"GRUB_ENABLE_CRYPTODISK=y"/g \
+    sed -i "s/^#GRUB_ENABLE_CRYPTODISK=y/GRUB_ENABLE_CRYPTODISK=y/g" \
         ${TMPDIR}/etc/default/grub 1> /dev/null 2>&1
 
     msg log "Creating crypt keys..."
@@ -953,6 +953,10 @@ installation() {
     sed -i "s/^FILES=\(.*\)/FILES=\(${files//\//\\/}\)/g" \
         ${TMPDIR}/etc/mkinitcpio.conf 1> /dev/null 2>&1
   fi
+
+  # Configure GRUB to allow automatic probing for other OS.
+  sed -i "s/^\(#G\|G\)RUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/g" \
+      ${TMPDIR}/etc/default/grub 1> /dev/null 2>&1
 
   # Restruct /boot permissions.
   chmod 700 ${TMPDIR}/boot
