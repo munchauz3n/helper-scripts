@@ -1509,6 +1509,14 @@ KERNELPARAMS=($(whiptail --clear --title "Arch Linux Installer" \
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
 # -----------------------------------------------------------------------------
+GPUDRIVERS=($(whiptail --clear --title "Arch Linux Installer" \
+  --checklist "Pick video drivers (press space):" 15 90 \
+  $(bc <<< "${#GPUDRIVERS[@]} / 3") "${GPUDRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
+
+# Check whiptail window return value.
+[[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+# -----------------------------------------------------------------------------
 ENVIRONMENT=$(whiptail --clear --title "Arch Linux Installer" \
   --radiolist "Pick desktop environment (press space):" 15 80 \
   $(bc <<< "${#ENVIRONMENTS[@]} / 3") "${ENVIRONMENTS[@]}" 3>&1 1>&2 2>&3 3>&-)
@@ -1536,27 +1544,20 @@ if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-  GPUDRIVERS=($(whiptail --clear --title "Arch Linux Installer" \
-    --checklist "Pick video drivers (press space):" 15 90 \
-    $(bc <<< "${#GPUDRIVERS[@]} / 3") "${GPUDRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
-
-  # Check whiptail window return value.
-  [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
-
   HWVIDEOACCELERATION=($(whiptail --clear --title "Arch Linux Installer" \
     --checklist "Pick hardware video acceleration drivers (press space):" 15 115 \
     $(bc <<< "${#HWVIDEOACCELERATION[@]} / 3") "${HWVIDEOACCELERATION[@]}" 3>&1 1>&2 2>&3 3>&-))
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
-
-  EXTRAPKGS=($(whiptail --clear --title "Arch Linux Installer" \
-    --checklist "Pick additional packages (press space):" 15 80 \
-    $(bc <<< "${#EXTRAPKGS[@]} / 3") "${EXTRAPKGS[@]}" 3>&1 1>&2 2>&3 3>&-))
-
-  # Check whiptail window return value.
-  [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 fi
+
+EXTRAPKGS=($(whiptail --clear --title "Arch Linux Installer" \
+  --checklist "Pick additional packages (press space):" 15 80 \
+  $(bc <<< "${#EXTRAPKGS[@]} / 3") "${EXTRAPKGS[@]}" 3>&1 1>&2 2>&3 3>&-))
+
+# Check whiptail window return value.
+[[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
 # -----------------------------------------------------------------------------
 # Verify configuration
