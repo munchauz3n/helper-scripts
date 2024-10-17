@@ -36,6 +36,12 @@ declare -a DISPLAYMANAGERS=(
   "LXDM" "Lightweight X11 Display Manager, does not support the XDMCP" "off"
 )
 
+# List of possible inteternet browsers.
+declare -a BROWSERS=(
+  "Vivaldi" "An advanced browser made with the power user in mind" "on"
+  "Firefox" "Fast, Private & Safe Web Browser" "off"
+)
+
 # List of possible processor microcodes.
 declare -a MICROCODES=(
   "AMD" "Install and enable AMD CPUs microcode updates in bootloader" "off"
@@ -628,6 +634,22 @@ setup_common_environment() {
     # Check arch-chroot return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to enable LXDM service!"; exit 1; }
   fi
+
+  if [[ ${BROWSERS[@]} == *"Vivaldi"* ]]; then
+    msg log "Installing Vivaldi browser..."
+    pacstrap ${TMPDIR} vivaldi vivaldi-ffmpeg-codecs 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Vivaldi browser!"; exit 1; }
+  fi
+
+  if [[ ${BROWSERS[@]} == *"Firefox"* ]]; then
+    msg log "Installing Firefox browser..."
+    pacstrap ${TMPDIR} firefox firefox-ublock-origin firefox-dark-reader 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Firefox browser!"; exit 1; }
+  fi
 }
 
 setup_gnome_environment() {
@@ -663,15 +685,15 @@ setup_gnome_environment() {
 
 setup_kde_environment() {
   msg log "Installing KDE packages..."
-  pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-firewall \
-           plasma-wayland-protocols plasma-disks plasma-systemmonitor plasma-workspace-wallpapers \
-           plasma-vault plasma-thunderbolt kdeplasma-addons kscreen kgamma kinfocenter kjournald \
-           kdialog kcron kwallet-pam kwalletmanager ksshaskpass konsole kweather ksystemlog krdp \
-           kjournald kdeconnect kwrited drkonqi xdg-desktop-portal-kde kde-gtk-config dolphin \
-           breeze breeze-gtk oxygen oxygen-sounds networkmanager sweeper discover wayland-protocols \
-           power-profiles-daemon powerdevil bluedevil partitionmanager spectacle gwenview kate \
-           yakuake qalculate-qt pulseaudio pavucontrol print-manager system-config-printer \
-           dav1d x265 vlc 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-systemmonitor \
+           plasma-wayland-protocols plasma-disks plasma-workspace-wallpapers plasma-thunderbolt \
+           plasma-vault plasma-browser-integration plasma-firewall kdeplasma-addons kinfocenter\
+           kscreen kgamma kjournald kdialog kcron kwallet-pam kwalletmanager ksshaskpass konsole \
+           kweather ksystemlog krdp kjournald kdeconnect kwrited drkonqi xdg-desktop-portal-kde \
+           kde-gtk-config dolphin breeze breeze-gtk oxygen oxygen-sounds networkmanager sweeper \
+           discover wayland-protocols power-profiles-daemon powerdevil bluedevil partitionmanager \
+           spectacle gwenview kate yakuake qalculate-qt pulseaudio pavucontrol print-manager \
+           system-config-printer dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install KDE packages!"; exit 1; }
@@ -1503,6 +1525,13 @@ if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == 
   DISPLAYMANAGER=$(whiptail --clear --title "Arch Linux Installer" \
     --radiolist "Pick  display manager (press space):" 15 90 \
     $(bc <<< "${#DISPLAYMANAGERS[@]} / 3") "${DISPLAYMANAGERS[@]}" 3>&1 1>&2 2>&3 3>&-)
+
+  # Check whiptail window return value.
+  [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+  BROWSERS=($(whiptail --clear --title "Arch Linux Installer" \
+    --checklist "Pick one of more internet browsers (press space):" 15 90 \
+    $(bc <<< "${#BROWSERS[@]} / 3") "${BROWSERS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
