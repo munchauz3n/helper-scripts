@@ -632,13 +632,14 @@ setup_common_environment() {
 
 setup_gnome_environment() {
   msg log "Installing GNOME packages..."
-  pacstrap ${TMPDIR} baobab eog evince file-roller gedit gnome-backgrounds \
-           gnome-calculator gnome-calendar gnome-clocks gnome-control-center gnome-logs gnome-menus \
+  pacstrap ${TMPDIR} baobab eog evince file-roller gedit gnome-control-center gnome-backgrounds \
+           gnome-calculator gnome-calendar gnome-clocks gnome-logs gnome-menus gnome-screenshot \
            gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
-           gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-themes-extra \
-           gnome-user-docs gnome-user-share gnome-video-effects gnome-weather gnome-bluetooth-3.0 \
-           gnome-icon-theme-extras gnome-software gnome-keyring mutter nautilus sushi gvfs yelp guake \
-           power-profiles-daemon pulseaudio pavucontrol networkmanager 1> /dev/null 2>&1
+           gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-weather \
+           gnome-themes-extra gnome-user-docs gnome-user-share gnome-video-effects gnome-software \
+           gnome-icon-theme-extras gnome-keyring networkmanager mutter power-profiles-daemon \
+           nautilus sushi gvfs yelp guake system-config-printer pulseaudio pavucontrol \
+           dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install GNOME packages!"; exit 1; }
@@ -663,12 +664,14 @@ setup_gnome_environment() {
 setup_kde_environment() {
   msg log "Installing KDE packages..."
   pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-firewall \
-           plasma-wayland-protocols plasma-disks kscreen dolphin konsole breeze breeze-gtk \
-           oxygen oxygen-sounds kde-gtk-config pulseaudio pavucontrol networkmanager yakuake \
-           kate ark kwalletmanager kweather kcron ksystemlog kjournald kdeconnect sweeper \
-           kdeplasma-addons kgamma kinfocenter plasma-browser-integration plasma-thunderbolt \
-           drkonqi plasma-systemmonitor plasma-vault plasma-workspace-wallpapers kdialog \
-           power-profiles-daemon powerdevil bluedevil discover qalculate-qt 1> /dev/null 2>&1
+           plasma-wayland-protocols plasma-disks plasma-systemmonitor plasma-workspace-wallpapers \
+           plasma-vault plasma-thunderbolt kdeplasma-addons kscreen kgamma kinfocenter kjournald \
+           kdialog kcron kwallet-pam kwalletmanager ksshaskpass konsole kweather ksystemlog krdp \
+           kjournald kdeconnect kwrited drkonqi xdg-desktop-portal-kde kde-gtk-config dolphin \
+           breeze breeze-gtk oxygen oxygen-sounds networkmanager sweeper discover wayland-protocols \
+           power-profiles-daemon powerdevil bluedevil partitionmanager spectacle gwenview kate \
+           yakuake qalculate-qt pulseaudio pavucontrol print-manager system-config-printer \
+           dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install KDE packages!"; exit 1; }
@@ -705,7 +708,7 @@ setup_xfce_environment() {
            xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-xkb-plugin xfce4-mount-plugin \
            xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-sensors-plugin xfce4-settings \
            xfce4-terminal xfce4-screensaver pulseaudio pavucontrol xfdesktop xfconf networkmanager \
-           network-manager-applet blueman 1> /dev/null 2>&1
+           network-manager-applet system-config-printer blueman dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install XFCE packages!"; exit 1; }
@@ -735,7 +738,7 @@ installation() {
            bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr \
            btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu texinfo \
            ttf-liberation acpi grub-btrfs inotify-tools timeshift ntfs-3g git btop rocm-smi-lib \
-           fwupd bc dosfstools os-prober libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
+           fwupd bc dosfstools mtools usbutils os-prober libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install base packages!"; exit 1; }
