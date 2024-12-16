@@ -464,7 +464,7 @@ setup_common_environment() {
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Mesa VA-API"* ]]; then
     msg log "Installing Mesa VA-API drivers..."
-    pacstrap ${TMPDIR} libva-mesa-driver 1> /dev/null 2>&1
+    pacstrap ${TMPDIR} libva-mesa-driver libva-utils 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to install VA-API drivers!"; exit 1; }
@@ -472,7 +472,7 @@ setup_common_environment() {
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Mesa VDPAU"* ]]; then
     msg log "Installing Mesa VDPAU drivers..."
-    pacstrap ${TMPDIR} mesa-vdpau 1> /dev/null 2>&1
+    pacstrap ${TMPDIR} mesa-vdpau vdpauinfo 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to install VDPAU drivers!"; exit 1; }
@@ -480,7 +480,7 @@ setup_common_environment() {
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Intel VA-API(>= Broadwell)"* ]]; then
     msg log "Installing Intel VA-API drivers for Broadwell and newer graphics..."
-    pacstrap ${TMPDIR} intel-media-driver 1> /dev/null 2>&1
+    pacstrap ${TMPDIR} intel-media-driver libva-utils 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to install VA-API drivers for Broadwell!"; exit 1; }
@@ -488,7 +488,7 @@ setup_common_environment() {
 
   if [[ ${HWVIDEOACCELERATION[@]} == *"Intel VA-API(<= Haswell)"* ]]; then
     msg log "Installing Intel VA-API drivers for Haswell and older graphics..."
-    pacstrap ${TMPDIR} libva-intel-driver 1> /dev/null 2>&1
+    pacstrap ${TMPDIR} libva-intel-driver libva-utils 1> /dev/null 2>&1
 
     # Check pacstrap return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to install VA-API drivers for Haswell!"; exit 1; }
@@ -659,8 +659,8 @@ setup_gnome_environment() {
            gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-weather \
            gnome-themes-extra gnome-user-docs gnome-user-share gnome-video-effects gnome-software \
-           gnome-icon-theme-extras gnome-keyring networkmanager mutter power-profiles-daemon \
-           nautilus sushi gvfs yelp guake system-config-printer pulseaudio pavucontrol \
+           gnome-icon-theme-extras gnome-firmware gnome-keyring networkmanager mutter nautilus \
+           power-profiles-daemon sushi gvfs yelp guake system-config-printer pulseaudio pavucontrol \
            dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
@@ -757,9 +757,9 @@ installation() {
 
   msg log "Installing base packages..."
   pacstrap ${TMPDIR} base base-devel linux linux-firmware util-linux usbutils man-db man-pages \
-           bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr \
-           btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu texinfo \
-           ttf-liberation acpi grub-btrfs inotify-tools timeshift ntfs-3g git btop rocm-smi-lib \
+           bash-completion openssh sudo gptfdisk tree wget vim iwd cryptsetup grub efibootmgr lshw \
+           btrfs-progs lm_sensors ntp dbus alsa-utils cronie terminus-font ttf-dejavu texinfo git \
+           ttf-liberation acpi grub-btrfs inotify-tools timeshift ntfs-3g btop rocm-smi-lib nvtop \
            fwupd bc dosfstools mtools usbutils os-prober libxkbcommon xdg-user-dirs 1> /dev/null 2>&1
 
   # Check pacstrap return value.
