@@ -1,6 +1,6 @@
 # Helper scripts
 
-## Arch Linux Installer `arch-linux-installer.sh`
+## `arch-linux-installer.sh`
 As the name suggests this is a Bash script for easier installation of Arch Linux.
 It supports console and graphical environments, multiple display managers, etc. and will guide the user through the installation process via dialog boxes (whiptail).
 
@@ -87,7 +87,7 @@ In case BIOS update resets the EFI bootloader the GRUB boot entry needs to be re
 #### Links
 [Dual boot Arch with Windows](https://wiki.archlinux.org/title/Dual_boot_with_Windows)
 
-## Bluetooth Dual Boot Synchronize Keys `bluetooth-dualboot-sync-keys.sh`
+## `bluetooth-dualboot-sync-keys.sh`
 When dual-booting Windows and Linux, bluetooth devices may have to be re-paired at each OS switch. This is due to both OSes having different sets of Bluetooth pairing keys. Things are further complicated as some devices generate new MAC address each time they are paired.
 
 This script helps transfer pairing keys from from one OS to the other by guiding the user through the synchronization process via dialog boxes (whiptail), keeping devices paired across both systems.
@@ -109,7 +109,7 @@ chmod +x ./bluetooth-dualboot-sync-keys.sh && sudo ./bluetooth-dualboot-sync-key
 #### Links
 [Bluetooth DualBoot Pairing](https://wiki.archlinux.org/title/Bluetooth#Dual_boot_pairing)
 
-## Bluetooth Autosuspend Rules `bluetooth-suspend-rules.sh`
+## `bluetooth-suspend-rules.sh`
 Small bash script for enabling or disabling bluetooth controler autosuspend and peripherials wakeup from suspend udev rules.
 
 On most motherboards the bluetooth controller is a USB device. The default timeout before a USB device goes to idle is 2000 ms.
