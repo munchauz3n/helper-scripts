@@ -85,3 +85,25 @@ In case BIOS update resets the EFI bootloader the GRUB boot entry needs to be re
 
 #### Links
 [Dual boot Arch with Windows](https://wiki.archlinux.org/title/Dual_boot_with_Windows)
+
+## Bluetooth Dual Boot Synchronize Keys `bluetooth-dualboot-sync-keys.sh`
+When dual-booting Windows and Linux, bluetooth devices may have to be re-paired at each OS switch. This is due to both OSes having different sets of Bluetooth pairing keys. Things are further complicated as some devices generate new MAC address each time they are paired.
+
+This script helps transfer pairing keys from from one OS to the other by guiding the user through the synchronization process via dialog boxes (whiptail), keeping devices paired across both systems.
+
+The synchronization can be done in both direction (`Linux To Windows` and `Windows To Linux`) depending on which OS the device was last paired (**user configures this setting**).
+- At `Windows To Linux` keys and additional information are extracted from the Windows bluetooth registry and imported to the Bluetooth configuration directory of the device on Linux.
+- At `Linux To Windows` keys and additional information are extracted from Bluetooth configuration directory of the device on Linux and imported into the Windows Bluetooth keys registry
+
+> [!CAUTION]
+> Even though synchronization can be done in both directions it is **recommended** to first pair the devices on Linux, then on Windows and after that run the script to transfer the keys from Windows To Linux.
+>
+> After pairing devices on Windows and switching back to Linux do not turn on the devices until their keys are synchronized. Some devices will try reset themselves.
+
+```bash
+curl -o bluetooth-dualboot-sync-keys.sh https://raw.githubusercontent.com/munchauz3n/helper-scripts/refs/heads/main/bluetooth-dualboot-sync-keys.sh
+chmod +x ./bluetooth-dualboot-sync-keys.sh && sudo ./bluetooth-dualboot-sync-keys.sh
+```
+
+#### Links
+[Bluetooth DualBoot Pairing](https://wiki.archlinux.org/title/Bluetooth#Dual_boot_pairing)
