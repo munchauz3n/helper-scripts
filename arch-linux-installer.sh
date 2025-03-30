@@ -1,4 +1,18 @@
 #!/bin/bash
+#
+# Configure and automate the process of installing Arch Linux.
+#
+# Copyright (C) 2020, 2023-2025  Petar G. Georgiev <petr.blake@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 
 # Dependencies.
 declare -a DEPENDNECIES=(
@@ -11,12 +25,11 @@ declare TMPDIR="/mnt"
 
 # Global variables.
 declare -a TMPLIST=()
-declare CONFIGURATION=""
 
 # List of additional bootloader kernel parameters.
 declare -a KERNELPARAMS=(
   "acpi_osi=Linux" "Tell BIOS that it's running Linux" "off"
-  "acpi_backlight=vendor" "First probe vendor specific backlight drives" "off"
+  "acpi_backlight=vendor" "First probe vendor specific display backlight drivers" "off"
 )
 
 # List of available user environments.
@@ -72,7 +85,17 @@ declare -a EXTRAPKGS=(
   "Bluetooth" "Install for Bluetooth support" "off"
 )
 
+declare TITLE="Arch Linux Installer"
+declare DESCRIPTION=""
+
+declare -i HEIGHT=0
+declare -i LISTHEIGHT=0
+declare -a FLAGS=()
+
+declare CMD=""
+declare ITEM=""
 declare DRIVE=""
+declare CONFIGURATION=""
 
 declare -a DELPARTITIONS=()
 declare EFIPARTITION=""
@@ -110,10 +133,10 @@ declare -a CLIFONTS=()
 declare CLIFONT=""
 
 
-# ============================================================================
+# =================================================================================================
 # Functions
-# ============================================================================
-msg() {
+# =================================================================================================
+function msg() {
   declare -A types=(
     ['error']='red'
     ['warning']='yellow'
@@ -150,13 +173,27 @@ msg() {
   fi
 }
 
-prepare() {
+function cleanup() {
+  msg info "Cleanup..."
+
+  umount -R ${TMPDIR} 1> /dev/null 2>&1
+  swapoff -L swap 1> /dev/null 2>&1
+
+  msg log "Done"
+}
+
+function prepare() {
+  local partitions
+  local partition
+
+  local mountpoint
+
   msg info "Getting ${DRIVE} ready..."
-  local partitions=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
+  partitions=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
 
   for partition in ${partitions[@]}; do
     while [ $(mount | grep -c "/dev/${partition}") != 0 ]; do
-      local mountpoint=$(mount | grep "/dev/${partition}" | head -1 | awk '{ print $3 }')
+      mountpoint=$(mount | grep "/dev/${partition}" | head -1 | awk '{ print $3 }')
 
       msg log "umount partition /dev/${partition} from ${mountpoint} ..."
       umount /dev/${partition} 1> /dev/null 2>&1
@@ -184,12 +221,12 @@ prepare() {
     # Wipe filesystem information.
     wipefs -a ${DRIVE} 1> /dev/null 2>&1
   else
-    for i in ${DELPARTITIONS[@]//\"}; do
-      msg log "Deleting partition /dev/${i}..."
-      sgdisk -d $(echo ${i} | grep -Eo '[0-9]+$') ${DRIVE} 1> /dev/null 2>&1
+    for ITEM in ${DELPARTITIONS[@]//\"}; do
+      msg log "Deleting partition /dev/${ITEM}..."
+      sgdisk -d $(echo ${ITEM} | grep -Eo '[0-9]+$') ${DRIVE} 1> /dev/null 2>&1
 
       # Check sgdisk return value.
-      [[ $? -ne 0 ]] && { msg error "Failed to delete /dev/${i} partition!"; exit 1; }
+      [[ $? -ne 0 ]] && { msg error "Failed to delete /dev/${ITEM} partition!"; exit 1; }
     done
 
     # Sort partition table entries
@@ -343,7 +380,7 @@ prepare() {
   msg log "Done"
 }
 
-setup_console_environment() {
+function setup_console_environment() {
   msg log "Installing ACPI daemon..."
   pacstrap ${TMPDIR} acpid 1> /dev/null 2>&1
 
@@ -411,7 +448,7 @@ setup_console_environment() {
   [[ $? == +(1|255) ]] && { msg error "Failed to enable resolve daemon service!"; exit 1; }
 }
 
-setup_common_environment() {
+function setup_common_environment() {
   msg log "Installing Xorg display server and xinitrc..."
   pacstrap ${TMPDIR} xorg-server xorg-xinit 1> /dev/null 2>&1
 
@@ -652,7 +689,7 @@ setup_common_environment() {
   fi
 }
 
-setup_gnome_environment() {
+function setup_gnome_environment() {
   msg log "Installing GNOME packages..."
   pacstrap ${TMPDIR} baobab eog evince file-roller gedit gnome-control-center gnome-backgrounds \
            gnome-calculator gnome-calendar gnome-clocks gnome-logs gnome-menus gnome-screenshot \
@@ -683,7 +720,7 @@ setup_gnome_environment() {
   [[ $? == +(1|255) ]] && { msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
-setup_kde_environment() {
+function setup_kde_environment() {
   msg log "Installing KDE packages..."
   pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-systemmonitor \
            plasma-wayland-protocols plasma-disks plasma-workspace-wallpapers plasma-thunderbolt \
@@ -723,7 +760,7 @@ setup_kde_environment() {
   [[ $? == +(1|255) ]] && { msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
-setup_xfce_environment() {
+function setup_xfce_environment() {
   msg log "Installing XFCE packages..."
   pacstrap ${TMPDIR} exo garcon mousepad thunar thunar-volman tumbler xfwm4 xfwm4-themes ristretto \
            xfce4-appfinder xfce4-panel xfce4-power-manager xfce4-session xfce4-pulseaudio-plugin \
@@ -752,7 +789,7 @@ setup_xfce_environment() {
   [[ $? == +(1|255) ]] && { msg error "Failed to enable NetworkManager service!"; exit 1; }
 }
 
-installation() {
+function install() {
   msg info "Creating installation..."
 
   msg log "Installing base packages..."
@@ -810,9 +847,11 @@ installation() {
   # Check arch-chroot return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to set HW clock!"; exit 1; }
 
+  local locale
+
   msg log "Setting locales..."
   for locale in "${LOCALES[@]//\"}"; do
-    sed -i s/"#${locale}"/"${locale}"/g ${TMPDIR}/etc/locale.gen 1> /dev/null 2>&1
+    sed -i s/^#${locale}/${locale}/g ${TMPDIR}/etc/locale.gen 1> /dev/null 2>&1
 
     # Check sed return value.
     [[ $? == +(1|255) ]] && { msg error "Failed to set '${locale}'!"; exit 1; }
@@ -1026,19 +1065,10 @@ installation() {
   msg log "Install complete"
 }
 
-cleanup() {
-  msg info "Cleanup..."
 
-  umount -R ${TMPDIR} 1> /dev/null 2>&1
-  swapoff -L swap 1> /dev/null 2>&1
-
-  msg log "Done"
-}
-
-
-# ============================================================================
+# =================================================================================================
 # MAIN
-# ============================================================================
+# =================================================================================================
 if [ "${EUID}" -ne 0 ]; then
   msg error "Script requires root privalages!"
   exit 1
@@ -1049,26 +1079,27 @@ ping -c 1 -q google.com >&/dev/null
 [[ $? != 0 ]] && { msg error "Internet access is required for installation!"; exit 1; }
 
 # Checks for dependencies
-for cmd in "${DEPENDNECIES[@]}"; do
-  if ! [[ -f "/bin/${cmd}" || -f "/sbin/${cmd}" || \
-          -f "/usr/bin/${cmd}" || -f "/usr/sbin/${cmd}" ]] ; then
-    msg error "'${cmd}' command is missing! Please install the relevant package."
+for CMD in "${DEPENDNECIES[@]}"; do
+  if ! [[ -f "/bin/${CMD}" || -f "/sbin/${CMD}" || \
+          -f "/usr/bin/${CMD}" || -f "/usr/sbin/${CMD}" ]] ; then
+    msg error "'${CMD}' command is missing! Please install the relevant package."
     exit 1
   fi
 done
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with curently available devices
 TMPLIST=($(lsblk -dn -o NAME))
 
-for i in ${TMPLIST[@]}; do
-  diskmodel=$(sfdisk -l /dev/${i} | grep -E "Disk model" | cut -d' ' -f 3- | sed 's/\s*$//g')
-  DEVICES+=("${i} (${diskmodel})" " $(lsblk -dn -o SIZE /dev/${i} | sed 's/^[[:space:]]*//g')")
+for ITEM in ${TMPLIST[@]}; do
+  diskmodel=$(sfdisk -l /dev/${ITEM} | grep -E "Disk model" | cut -d' ' -f 3- | sed 's/\s*$//g')
+  DEVICES+=("${ITEM} (${diskmodel})" " $(lsblk -dn -o SIZE /dev/${ITEM} | sed 's/^[[:space:]]*//g')")
 done
 
-DEVICE=$(whiptail --title "Arch Linux Installer" \
-  --menu "Choose drive - Be sure the correct device is selected!" 20 60 10 \
-  "${DEVICES[@]}" 3>&2 2>&1 1>&3)
+DESCRIPTION="Choose drive - Be sure the correct device is selected!"
+FLAGS=(--clear --title "${TITLE}" --menu "${DESCRIPTION}" 20 60 10)
+
+DEVICE=$(whiptail "${FLAGS[@]}" "${DEVICES[@]}" 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1082,7 +1113,7 @@ DEVICE=$(echo ${DEVICE} | awk '{ print $1 }')
 DRIVE="/dev/${DEVICE}"
 CONFIGURATION+="  Drive = ${DRIVE}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Find out the total disk size (KiB).
 TOTALSIZE=$(sfdisk -s ${DRIVE})
 
@@ -1095,18 +1126,23 @@ FREESPACE=$(sfdisk -F ${DRIVE} | awk '/Unpartitioned space/ { print $6 }')
 # Retrieve a list with curently available device partitions
 TMPLIST=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
 
-for i in ${TMPLIST[@]}; do
-  description=$(printf "%-10s" "$(lsblk -no FSTYPE /dev/${i})")
-  description+=$(printf " %-30s" "$(lsblk -no PARTTYPENAME /dev/${i})")
-  description+=$(printf " %10s" "$(lsblk -no SIZE /dev/${i})")
+for ITEM in ${TMPLIST[@]}; do
+  description=$(printf "%-10s" "$(lsblk -no FSTYPE /dev/${ITEM})")
+  description+=$(printf " %-30s" "$(lsblk -no PARTTYPENAME /dev/${ITEM})")
+  description+=$(printf " %10s" "$(lsblk -no SIZE /dev/${ITEM})")
 
-  DEVICES+=("${i}" "${description}" "off")
+  DEVICES+=("${ITEM}" "${description}" "off")
 done
 
 if [[ ${#DEVICES[@]} != 0 ]]; then
-  DELPARTITIONS=($(whiptail --clear --title "Arch Linux Installer" \
-    --checklist "Choose whether to delete existing partitions" 15 80 \
-    $(bc <<< "${#DEVICES[@]} / 3") "${DEVICES[@]}" 3>&1 1>&2 2>&3 3>&-))
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#DEVICES[@]} / 3 + 10))
+  LISTHEIGHT=$((${#DEVICES[@]} / 3))
+
+  DESCRIPTION="Choose whether to delete existing partitions"
+  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
+
+  DELPARTITIONS=($(whiptail "${FLAGS[@]}" "${DEVICES[@]}" 3>&1 1>&2 2>&3 3>&-))
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1115,44 +1151,50 @@ if [[ ${#DEVICES[@]} != 0 ]]; then
 fi
 
 # Increase the the free space with the sizes of the partitions for deletion.
-for i in ${DELPARTITIONS[@]//\"}; do
-  FREESPACE=$(bc <<< "${FREESPACE} + $(sfdisk -s /dev/${i})")
+for ITEM in ${DELPARTITIONS[@]//\"}; do
+  FREESPACE=$(bc <<< "${FREESPACE} + $(sfdisk -s /dev/${ITEM})")
 done
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Find if there is are existing EFI partitions.
 TMPLIST=($(lsblk ${DRIVE} -no KNAME | grep -E ${DEVICE}.*[0-9]+))
 
-for i in ${TMPLIST[@]}; do
-  [[ "$(lsblk -no PTTYPE /dev/${i})" != "gpt" ]] && continue
-  [[ "$(lsblk -no FSTYPE /dev/${i})" != "vfat" ]] && continue
-  [[ "$(lsblk -no PARTTYPENAME /dev/${i})" != *"EFI System"* ]] && continue
+for ITEM in ${TMPLIST[@]}; do
+  [[ "$(lsblk -no PTTYPE /dev/${ITEM})" != "gpt" ]] && continue
+  [[ "$(lsblk -no FSTYPE /dev/${ITEM})" != "vfat" ]] && continue
+  [[ "$(lsblk -no PARTTYPENAME /dev/${ITEM})" != *"EFI System"* ]] && continue
 
   # Skip if the partition is among the list for deletion.
-  [[ "${DELPARTITIONS[*]}" =~ "${i}" ]] && continue
+  [[ "${DELPARTITIONS[*]}" =~ "${ITEM}" ]] && continue
 
-  description=$(printf "%-10s" "$(lsblk -no LABEL /dev/${i})")
-  description+=$(printf " %-10s" "$(lsblk -no FSVER /dev/${i})")
-  description+=$(printf " %-10s" "$(lsblk -no MOUNTPOINT /dev/${i})")
-  description+=$(printf " %10s" "$(lsblk -no SIZE /dev/${i})")
+  description=$(printf "%-10s" "$(lsblk -no LABEL /dev/${ITEM})")
+  description+=$(printf " %-10s" "$(lsblk -no FSVER /dev/${ITEM})")
+  description+=$(printf " %-10s" "$(lsblk -no MOUNTPOINT /dev/${ITEM})")
+  description+=$(printf " %10s" "$(lsblk -no SIZE /dev/${ITEM})")
 
   # Found an EFI partition, add it to the list.
-  DEVICES+=("${i}" "${description}" "off")
+  DEVICES+=("${ITEM}" "${description}" "off")
 done
 
 if [[ ${#DEVICES[@]} != 0 ]]; then
-  EFIPARTITION=$(whiptail --clear --title "Arch Linux Installer" \
-    --radiolist "Pick EFI partition to reuse or don't choose any in order to create a new custom partition" 15 80 \
-    $(bc <<< "${#DEVICES[@]} / 3") "${DEVICES[@]}" 3>&1 1>&2 2>&3 3>&-)
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#DEVICES[@]} / 3 + 10))
+  LISTHEIGHT=$((${#DEVICES[@]} / 3))
+
+  DESCRIPTION="Pick EFI partition to reuse or don't choose any in order to create a new partition"
+  FLAGS=(--clear --title "${TITLE}" --radiolist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
+
+  EFIPARTITION=$(whiptail "${FLAGS[@]}" "${DEVICES[@]}" 3>&1 1>&2 2>&3 3>&-)
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 fi
 
 if [ -z ${EFIPARTITION} ]; then
-  EFISIZE=$(whiptail --clear --title "Arch Linux Installer" \
-    --inputbox "EFI partition size: (KiB) (Free space: ${FREESPACE} KiB)" 8 60 \
-    ${EFISIZE} 3>&1 1>&2 2>&3 3>&-)
+  DESCRIPTION="EFI partition size: (KiB) (Free space: ${FREESPACE} KiB)"
+  FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 60)
+
+  EFISIZE=$(whiptail "${FLAGS[@]}" ${EFISIZE} 3>&1 1>&2 2>&3 3>&-)
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1177,10 +1219,10 @@ else
   CONFIGURATION+="  EFI partition = ${EFIPARTITION}\n"
 fi
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Calculate physical RAM size.
-for mem in /sys/devices/system/memory/memory*; do
-  [[ "$(cat ${mem}/online)" != "1" ]] && continue
+for ITEM in /sys/devices/system/memory/memory*; do
+  [[ "$(cat ${ITEM}/online)" != "1" ]] && continue
   SWAPSIZE=$((SWAPSIZE + $((0x$(cat /sys/devices/system/memory/block_size_bytes)))));
 done
 
@@ -1201,9 +1243,10 @@ elif [[ $(bc <<< "${SWAPSIZE} >= (2048 * 1014)") -eq 1 ]]; then
   SWAPSIZE=$(bc <<< "((${SWAPSIZE} + 0.5) / 1) * 1024^2") # Round & convert to KiB.
 fi
 
-SWAPSIZE=$(whiptail --clear --title "Arch Linux Installer" \
-  --inputbox "SWAP partition size: (KiB) (Free space: ${FREESPACE} KiB)" 8 60 \
-  ${SWAPSIZE} 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="SWAP partition size: (KiB) (Free space: ${FREESPACE} KiB)"
+FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 60)
+
+SWAPSIZE=$(whiptail "${FLAGS[@]}" ${SWAPSIZE} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1224,10 +1267,11 @@ fi
 FREESPACE=$(bc <<< "${FREESPACE} - ${SWAPSIZE}")
 CONFIGURATION+="  SWAP partition size = ${SWAPSIZE} (KiB)\n"
 
-# -----------------------------------------------------------------------------
-SWAPPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-  --passwordbox "Enter SWAP partition password.\nLeave empty if encryption is not required." 8 60 \
-  ${SWAPPASSWORD} 3>&1 1>&2 2>&3 3>&-)
+# -------------------------------------------------------------------------------------------------
+DESCRIPTION="Enter SWAP partition password.\nLeave empty if encryption is not required."
+FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+SWAPPASSWORD=$(whiptail "${FLAGS[@]}" ${SWAPPASSWORD} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1236,9 +1280,10 @@ SWAPPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
 if [ -z "${SWAPPASSWORD}" ]; then
   CONFIGURATION+="  Password for SWAP partition = NONE\n"
 else
-  CONFIRMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-    --passwordbox "Confirm SWAP partition password:" 8 60 \
-    3>&1 1>&2 2>&3 3>&-)
+  DESCRIPTION="Confirm SWAP partition password:"
+  FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+  CONFIRMPASSWORD=$(whiptail "${FLAGS[@]}" 3>&1 1>&2 2>&3 3>&-)
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1250,10 +1295,11 @@ else
   CONFIGURATION+="  Password for SWAP partition = (password hidden)\n"
 fi
 
-# -----------------------------------------------------------------------------
-SYSTEMSIZE=$(whiptail --clear --title "Arch Linux Installer" --inputbox \
-  "SYSTEM partition size: (KiB) (Free space: ${FREESPACE} KiB)
-  0 == Use all available free space" 10 60 ${SYSTEMSIZE} 3>&1 1>&2 2>&3 3>&-)
+# -------------------------------------------------------------------------------------------------
+DESCRIPTION="SYSTEM partition size: (KiB) (Free space: ${FREESPACE} KiB) 0 == Use all free space"
+FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 10 60)
+
+SYSTEMSIZE=$(whiptail "${FLAGS[@]}" ${SYSTEMSIZE} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1270,10 +1316,11 @@ fi
 [ ${SYSTEMSIZE} -eq 0 ] && CONFIGURATION+="  SYSTEM partition size = ${FREESPACE} (KiB)\n"
 [ ${SYSTEMSIZE} -ne 0 ] && CONFIGURATION+="  SYSTEM partition size = ${SYSTEMSIZE} (KiB)\n"
 
-# -----------------------------------------------------------------------------
-SYSTEMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-  --passwordbox "Enter SYSTEM partition password.\nLeave empty if encryption is not required." 8 60 \
-  ${SYSTEMPASSWORD} 3>&1 1>&2 2>&3 3>&-)
+# -------------------------------------------------------------------------------------------------
+DESCRIPTION="Enter SYSTEM partition password.\nLeave empty if encryption is not required."
+FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+SYSTEMPASSWORD=$(whiptail "${FLAGS[@]}" ${SYSTEMPASSWORD} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1282,9 +1329,10 @@ SYSTEMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
 if [ -z "${SYSTEMPASSWORD}" ]; then
   CONFIGURATION+="  Password for SYSTEM partition = NONE\n"
 else
-  CONFIRMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-    --passwordbox "Confirm SYSTEM partition password:" 8 60 \
-    3>&1 1>&2 2>&3 3>&-)
+  DESCRIPTION="Confirm SYSTEM partition password:"
+  FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+  CONFIRMPASSWORD=$(whiptail "${FLAGS[@]}" 3>&1 1>&2 2>&3 3>&-)
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1296,76 +1344,84 @@ else
   CONFIGURATION+="  Password for SYSTEM partition = (password hidden)\n"
 fi
 
-# -----------------------------------------------------------------------------
-whiptail --clear --title "Arch Linux Installer" \
-  --yesno "Add new user?" 7 30 3>&1 1>&2 2>&3 3>&-
+# -------------------------------------------------------------------------------------------------
+whiptail --clear --title "${TITLE}" --yesno "Add new user?" 7 30 3>&1 1>&2 2>&3 3>&-
 
 case $? in
-  0) USERNAME=$(whiptail --clear --title "Arch Linux Installer" \
-       --inputbox "Enter username: (usernames must be all lowercase)" \
-       8 60 ${USERNAME} 3>&1 1>&2 2>&3 3>&-)
+  0)
+    DESCRIPTION="Enter username: (usernames must be all lowercase)"
+    FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 60)
 
-     # Check whiptail window return value.
-     [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+    USERNAME=$(whiptail "${FLAGS[@]}" ${USERNAME} 3>&1 1>&2 2>&3 3>&-)
 
-     if [[ "${USERNAME}" =~ [A-Z] ]] || [[ "${USERNAME}" == *['!'@#\$%^\&*()_+]* ]]; then
-       msg error "Username contains invalid characters."; exit 1
-     fi
+    # Check whiptail window return value.
+    [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-     # Check if a name has been entered.
-     [ -z "${USERNAME}" ] && { msg error "Empty value!"; exit 1; }
+    if [[ "${USERNAME}" =~ [A-Z] ]] || [[ "${USERNAME}" == *['!'@#\$%^\&*()_+]* ]]; then
+      msg error "Username contains invalid characters."; exit 1
+    fi
 
-     FULLNAME=$(whiptail --clear --title "Arch Linux Installer" \
-       --inputbox "Enter Full Name for ${USERNAME}:" 8 50 "${FULLNAME}" \
-       3>&1 1>&2 2>&3 3>&-)
+    # Check if a name has been entered.
+    [ -z "${USERNAME}" ] && { msg error "Empty value!"; exit 1; }
 
-     # Check whiptail window return value.
-     [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+    DESCRIPTION="Enter Full Name for ${USERNAME}:"
+    FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 50)
 
-     # Check if a user name has been entered.
-     [ -z "${FULLNAME}" ] && { msg error "Empty value!"; exit 1; }
+    FULLNAME=$(whiptail "${FLAGS[@]}" "${FULLNAME}" 3>&1 1>&2 2>&3 3>&-)
 
-     USERGROUPS=$(whiptail --clear --title "Arch Linux Installer" --inputbox \
-       "Enter additional groups for ${USERNAME} in a comma seperated list:(default is wheel)" \
-       8 90 "wheel" 3>&1 1>&2 2>&3 3>&-)
+    # Check whiptail window return value.
+    [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-     # Check whiptail window return value.
-     [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+    # Check if a user name has been entered.
+    [ -z "${FULLNAME}" ] && { msg error "Empty value!"; exit 1; }
 
-     PASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-       --passwordbox "Enter Password for ${USERNAME}:" 8 60 \
-       ${PASSWORD} 3>&1 1>&2 2>&3 3>&-)
+    DESCRIPTION="Enter additional groups for ${USERNAME} in a comma seperated list:(default is wheel)"
+    FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 90)
 
-     # Check whiptail window return value.
-     [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+    USERGROUPS=$(whiptail "${FLAGS[@]}" "wheel" 3>&1 1>&2 2>&3 3>&-)
 
-     # Check if a password has been entered.
-     [ -z "${PASSWORD}" ] && { msg error "Empty value!"; exit 1; }
+    # Check whiptail window return value.
+    [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-     CONFIRMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-       --passwordbox "Confirm Password for ${USERNAME}:" 8 60 \
-       3>&1 1>&2 2>&3 3>&-)
+    DESCRIPTION="Enter Password for ${USERNAME}:"
+    FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
 
-     # Check whiptail window return value.
-     [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+    PASSWORD=$(whiptail "${FLAGS[@]}" ${PASSWORD} 3>&1 1>&2 2>&3 3>&-)
 
-     if [[ "${PASSWORD}" != "${CONFIRMPASSWORD}" ]]; then
-       msg error "User passwords do not match!"; exit 1
-     fi
+    # Check whiptail window return value.
+    [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-     CONFIGURATION+="  Username = ${USERNAME} (${FULLNAME})\n"
-     CONFIGURATION+="  Additional usergroups = ${USERGROUPS}\n"
-     CONFIGURATION+="  Password for ${USERNAME} = (password hidden)\n"
-     ;;
-  255) msg info "Installation aborted...."; exit 1;;
+    # Check if a password has been entered.
+    [ -z "${PASSWORD}" ] && { msg error "Empty value!"; exit 1; }
+
+    DESCRIPTION="Confirm Password for ${USERNAME}:"
+    FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+    CONFIRMPASSWORD=$(whiptail "${FLAGS[@]}" 3>&1 1>&2 2>&3 3>&-)
+
+    # Check whiptail window return value.
+    [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+    if [[ "${PASSWORD}" != "${CONFIRMPASSWORD}" ]]; then
+      msg error "User passwords do not match!"; exit 1
+    fi
+
+    CONFIGURATION+="  Username = ${USERNAME} (${FULLNAME})\n"
+    CONFIGURATION+="  Additional usergroups = ${USERGROUPS}\n"
+    CONFIGURATION+="  Password for ${USERNAME} = (password hidden)\n"
+    ;;
+  255)
+    msg info "Installation aborted...." && exit 1
+    ;;
 esac
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 CONFIRMPASSWORD=${ROOTPASSWORD}
 
-ROOTPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-  --passwordbox "Enter Root Password:(default is 'root')" 8 60 \
-  ${ROOTPASSWORD} 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Enter Root Password:(default is 'root')"
+FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+ROOTPASSWORD=$(whiptail "${FLAGS[@]}" ${ROOTPASSWORD} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1373,9 +1429,10 @@ ROOTPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
 # Check if a root password has been entered.
 [ -z "${ROOTPASSWORD}" ] && { msg error "Empty value!"; exit 1; }
 
-CONFIRMPASSWORD=$(whiptail --clear --title "Arch Linux Installer" \
-  --passwordbox "Confirm Root Password:(default is 'root')" 8 60 ${CONFIRMPASSWORD} \
-  3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Confirm Root Password:(default is 'root')"
+FLAGS=(--clear --title "${TITLE}" --passwordbox "${DESCRIPTION}" 8 60)
+
+CONFIRMPASSWORD=$(whiptail "${FLAGS[@]}" ${CONFIRMPASSWORD} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1384,10 +1441,11 @@ if [[ "${ROOTPASSWORD}" != "${CONFIRMPASSWORD}" ]]; then
   msg error "Root passwords do not match!"; exit 1
 fi
 
-# -----------------------------------------------------------------------------
-HOSTNAME=$(whiptail --clear --title "Arch Linux Installer" \
-  --inputbox "Enter desired hostname for this system:" 8 50 ${HOSTNAME} \
-  3>&1 1>&2 2>&3 3>&-)
+# -------------------------------------------------------------------------------------------------
+DESCRIPTION="Enter desired hostname for this system:"
+FLAGS=(--clear --title "${TITLE}" --inputbox "${DESCRIPTION}" 8 50)
+
+HOSTNAME=$(whiptail "${FLAGS[@]}" ${HOSTNAME} 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1397,17 +1455,18 @@ HOSTNAME=$(whiptail --clear --title "Arch Linux Installer" \
 
 CONFIGURATION+="  Hostname = ${HOSTNAME}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with available timezones.
 TMPLIST=($(timedatectl list-timezones))
 
-for i in ${TMPLIST[@]}; do
-  TIMEZONES+=("${i}" "")
+for ITEM in ${TMPLIST[@]}; do
+  TIMEZONES+=("${ITEM}" "")
 done
 
-TIMEZONE=$(whiptail --clear --title "Arch Linux Installer" \
-  --menu "Choose your timezone:" 20 50 12 \
-  "${TIMEZONES[@]}" 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Choose your timezone:"
+FLAGS=(--clear --title "${TITLE}" --menu "${DESCRIPTION}" 20 50 12)
+
+TIMEZONE=$(whiptail "${FLAGS[@]}" "${TIMEZONES[@]}" 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1417,14 +1476,14 @@ TIMEZONE=$(whiptail --clear --title "Arch Linux Installer" \
 
 CONFIGURATION+="  Timezone = ${TIMEZONE}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with available locales.
-LOCALES=($(awk '/^#.*UTF-8/ { print $0 }' /etc/locale.gen | \
-           tail -n +2 | sed -e 's/^#*//' | sort -u))
+LOCALES=($(awk '/^.*UTF-8/ { print $0 }' /etc/locale.gen | sed -e 's/^#*//' | sort -u))
 
-LANG=$(whiptail --clear --title "Arch Linux Installer" \
-  --menu "Choose your language:" 20 50 12 \
-  "${LOCALES[@]}" 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Choose your language:"
+FLAGS=(--clear --title "${TITLE}" --menu "${DESCRIPTION}" 20 50 12)
+
+LANG=$(whiptail "${FLAGS[@]}" "${LOCALES[@]}" 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1434,14 +1493,14 @@ LANG=$(whiptail --clear --title "Arch Linux Installer" \
 
 CONFIGURATION+="  Language = ${LANG}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with available locales.
-LOCALES=($(awk '/^#.*UTF-8/ { print $0 " off" }' /etc/locale.gen | \
-           tail -n +2 | sed -e 's/^#*//' | sort -u))
+LOCALES=($(awk '/^.*UTF-8/ { print $0 " off" }' /etc/locale.gen | sed -e 's/^#*//' | sort -u))
 
-LOCALES=($(whiptail --clear --title "Arch Linux Installer" \
-  --checklist "Choose your locales:" 20 50 12 \
-  "${LOCALES[@]}" 3>&1 1>&2 2>&3 3>&-))
+DESCRIPTION="Choose your locales:"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" 20 50 12)
+
+LOCALES=($(whiptail "${FLAGS[@]}" "${LOCALES[@]}" 3>&1 1>&2 2>&3 3>&-))
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1451,17 +1510,18 @@ LOCALES=($(whiptail --clear --title "Arch Linux Installer" \
 
 CONFIGURATION+="  Locales = ${LOCALES[@]}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with available keyboard layouts.
 TMPLIST=($(localectl list-keymaps))
 
-for i in ${TMPLIST[@]}; do
-  CLIKEYMAPS+=("${i}" "")
+for ITEM in ${TMPLIST[@]}; do
+  CLIKEYMAPS+=("${ITEM}" "")
 done
 
-CLIKEYMAP=$(whiptail --clear --title "Arch Linux Installer" \
-  --menu "Choose your TTY keyboard layout:" 20 50 12 \
-  "${CLIKEYMAPS[@]}" 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Choose your TTY keyboard layout:"
+FLAGS=(--clear --title "${TITLE}" --menu "${DESCRIPTION}" 20 50 12)
+
+CLIKEYMAP=$(whiptail "${FLAGS[@]}" "${CLIKEYMAPS[@]}" 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1469,20 +1529,21 @@ CLIKEYMAP=$(whiptail --clear --title "Arch Linux Installer" \
 # Check if a keymap has been chosen.
 [ -z "${CLIKEYMAP}" ] && { msg error "Empty value!"; exit 1; }
 
-CONFIGURATION+="  TTY Keyboard layout = ${CLIKEYMAP}"
+CONFIGURATION+="  TTY Keyboard layout = ${CLIKEYMAP}\n"
 
-# -----------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------------
 # Retrieve a list with available font layouts.
 TMPLIST=($(find /usr/share/kbd/consolefonts/ -type f -name "*.psfu.gz" | \
            awk -F'/' '{ print $6 }' | cut -d'.' -f1))
 
-for i in ${TMPLIST[@]}; do
-  CLIFONTS+=("${i}" "")
+for ITEM in ${TMPLIST[@]}; do
+  CLIFONTS+=("${ITEM}" "")
 done
 
-CLIFONT=$(whiptail --clear --title "Arch Linux Installer" \
-  --menu "Choose your TTY font layout:" 20 50 12 \
-  "${CLIFONTS[@]}" 3>&1 1>&2 2>&3 3>&-)
+DESCRIPTION="Choose your TTY font layout:"
+FLAGS=(--clear --title "${TITLE}" --menu "${DESCRIPTION}" 20 50 12)
+
+CLIFONT=$(whiptail "${FLAGS[@]}" "${CLIFONTS[@]}" 3>&1 1>&2 2>&3 3>&-)
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
@@ -1490,39 +1551,67 @@ CLIFONT=$(whiptail --clear --title "Arch Linux Installer" \
 # Check if a keymap has been chosen.
 [ -z "${CLIFONT}" ] && { msg error "Empty value!"; exit 1; }
 
-CONFIGURATION+="  TTY font layout = ${CLIFONT}"
+CONFIGURATION+="  TTY font layout = ${CLIFONT}\n"
 
-# -----------------------------------------------------------------------------
-MICROCODES=($(whiptail --clear --title "Arch Linux Installer" \
-  --checklist "Pick CPU microcodes (press space):" 15 80 \
-  $(bc <<< "${#MICROCODES[@]} / 3") "${MICROCODES[@]}" 3>&1 1>&2 2>&3 3>&-))
+# -------------------------------------------------------------------------------------------------
+# Calculate the height based on the number of entries and increase by 10 for window compensation.
+HEIGHT=$((${#MICROCODES[@]} / 3 + 10))
+LISTHEIGHT=$((${#MICROCODES[@]} / 3))
 
-# Check whiptail window return value.
-[[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+DESCRIPTION="Pick CPU microcodes (press space):"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
 
-# -----------------------------------------------------------------------------
-KERNELPARAMS=($(whiptail --clear --title "Arch Linux Installer" \
-  --checklist "Pick kernel boot parameters (press space):" 15 80 \
-  $(bc <<< "${#KERNELPARAMS[@]} / 3") "${KERNELPARAMS[@]}" 3>&1 1>&2 2>&3 3>&-))
+MICROCODES=($(whiptail "${FLAGS[@]}" "${MICROCODES[@]}" 3>&1 1>&2 2>&3 3>&-))
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-# -----------------------------------------------------------------------------
-GPUDRIVERS=($(whiptail --clear --title "Arch Linux Installer" \
-  --checklist "Pick video drivers (press space):" 15 90 \
-  $(bc <<< "${#GPUDRIVERS[@]} / 3") "${GPUDRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
+[ ${#MICROCODES[@]} != 0 ] && CONFIGURATION+="  Microcodes = ${MICROCODES[@]}\n"
+
+# -------------------------------------------------------------------------------------------------
+# Calculate the height based on the number of entries and increase by 10 for window compensation.
+HEIGHT=$((${#KERNELPARAMS[@]} / 3 + 10))
+LISTHEIGHT=$((${#KERNELPARAMS[@]} / 3))
+
+DESCRIPTION="Optional additional kernel boot parameters (press space):"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+
+KERNELPARAMS=($(whiptail "${FLAGS[@]}" "${KERNELPARAMS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-# -----------------------------------------------------------------------------
-ENVIRONMENT=$(whiptail --clear --title "Arch Linux Installer" \
-  --radiolist "Pick desktop environment (press space):" 15 80 \
-  $(bc <<< "${#ENVIRONMENTS[@]} / 3") "${ENVIRONMENTS[@]}" 3>&1 1>&2 2>&3 3>&-)
+[ ${#KERNELPARAMS[@]} != 0 ] && CONFIGURATION+="  Additional Kernel Params = ${KERNELPARAMS[@]}\n"
+
+# -------------------------------------------------------------------------------------------------
+# Calculate the height based on the number of entries and increase by 10 for window compensation.
+HEIGHT=$((${#GPUDRIVERS[@]} / 3 + 10))
+LISTHEIGHT=$((${#GPUDRIVERS[@]} / 3))
+
+DESCRIPTION="Pick video drivers (press space):"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+
+GPUDRIVERS=($(whiptail "${FLAGS[@]}" "${GPUDRIVERS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+[ ${#GPUDRIVERS[@]} != 0 ] && CONFIGURATION+="  GPU Drivers = ${GPUDRIVERS[@]}\n"
+
+# -------------------------------------------------------------------------------------------------
+# Calculate the height based on the number of entries and increase by 10 for window compensation.
+HEIGHT=$((${#ENVIRONMENTS[@]} / 3 + 10))
+LISTHEIGHT=$((${#ENVIRONMENTS[@]} / 3))
+
+DESCRIPTION="Pick desktop environment (press space):"
+FLAGS=(--clear --title "${TITLE}" --radiolist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
+
+ENVIRONMENT=$(whiptail "${FLAGS[@]}" "${ENVIRONMENTS[@]}" 3>&1 1>&2 2>&3 3>&-)
+
+# Check whiptail window return value.
+[[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+CONFIGURATION+="  Environment = ${ENVIRONMENT}"
 
 if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == "XFCE" ]]; then
   # Enable the default manager based on the chosen environment.
@@ -1530,48 +1619,81 @@ if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == 
   [[ ${ENVIRONMENT} == "KDE" ]] && { DISPLAYMANAGERS[5]="on"; }
   [[ ${ENVIRONMENT} == "XFCE" ]] && { DISPLAYMANAGERS[8]="on"; }
 
-  DISPLAYMANAGER=$(whiptail --clear --title "Arch Linux Installer" \
-    --radiolist "Pick  display manager (press space):" 15 90 \
-    $(bc <<< "${#DISPLAYMANAGERS[@]} / 3") "${DISPLAYMANAGERS[@]}" 3>&1 1>&2 2>&3 3>&-)
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#DISPLAYMANAGERS[@]} / 3 + 10))
+  LISTHEIGHT=$((${#DISPLAYMANAGERS[@]} / 3))
+
+  DESCRIPTION="Pick  display manager (press space):"
+  FLAGS=(--clear --title "${TITLE}" --radiolist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+
+  DISPLAYMANAGER=$(whiptail "${FLAGS[@]}" "${DISPLAYMANAGERS[@]}" 3>&1 1>&2 2>&3 3>&-)
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-  BROWSERS=($(whiptail --clear --title "Arch Linux Installer" \
-    --checklist "Pick one of more internet browsers (press space):" 15 90 \
-    $(bc <<< "${#BROWSERS[@]} / 3") "${BROWSERS[@]}" 3>&1 1>&2 2>&3 3>&-))
+  CONFIGURATION+="\n  Display Manager = ${DISPLAYMANAGER}"
+
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#BROWSERS[@]} / 3 + 10))
+  LISTHEIGHT=$((${#BROWSERS[@]} / 3))
+
+  DESCRIPTION="Pick one of more internet browsers (press space):"
+  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+
+  BROWSERS=($(whiptail "${FLAGS[@]}" "${BROWSERS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-  HWVIDEOACCELERATION=($(whiptail --clear --title "Arch Linux Installer" \
-    --checklist "Pick hardware video acceleration drivers (press space):" 15 115 \
-    $(bc <<< "${#HWVIDEOACCELERATION[@]} / 3") "${HWVIDEOACCELERATION[@]}" 3>&1 1>&2 2>&3 3>&-))
+  [ ${#BROWSERS[@]} != 0 ] && CONFIGURATION+="\n  Browsers = ${BROWSERS[@]}"
+
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#HWVIDEOACCELERATION[@]} / 3 + 10))
+  LISTHEIGHT=$((${#HWVIDEOACCELERATION[@]} / 3))
+
+  DESCRIPTION="Pick hardware video acceleration drivers (press space):"
+  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 115 ${LISTHEIGHT})
+
+  HWVIDEOACCELERATION=($(whiptail "${FLAGS[@]}" "${HWVIDEOACCELERATION[@]}" 3>&1 1>&2 2>&3 3>&-))
 
   # Check whiptail window return value.
   [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+  if [ ${#HWVIDEOACCELERATION[@]} != 0 ]; then
+    CONFIGURATION+="\n  Video Acceleration drivers = ${HWVIDEOACCELERATION[@]}"
+  fi
 fi
 
-EXTRAPKGS=($(whiptail --clear --title "Arch Linux Installer" \
-  --checklist "Pick additional packages (press space):" 15 80 \
-  $(bc <<< "${#EXTRAPKGS[@]} / 3") "${EXTRAPKGS[@]}" 3>&1 1>&2 2>&3 3>&-))
+# Calculate the height based on the number of entries and increase by 10 for window compensation.
+HEIGHT=$((${#EXTRAPKGS[@]} / 3 + 10))
+LISTHEIGHT=$((${#EXTRAPKGS[@]} / 3))
+
+DESCRIPTION="Pick additional packages (press space):"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
+
+EXTRAPKGS=($(whiptail "${FLAGS[@]}" "${EXTRAPKGS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
 # Check whiptail window return value.
 [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
 
-# -----------------------------------------------------------------------------
+[ ${#EXTRAPKGS[@]} != 0 ] && CONFIGURATION+="\n  Extra packages = ${EXTRAPKGS[@]}"
+
+# -------------------------------------------------------------------------------------------------
 # Verify configuration
-whiptail --clear --title "Arch Linux Installer" \
-  --yesno "Is the below information correct:\n${CONFIGURATION}" 20 70 \
-  3>&1 1>&2 2>&3 3>&-
+CONFIGURATION="Is the below information correct:\n${CONFIGURATION}"
+
+# Calculate the height based on the number of lines and increase by 8 for window compensation.
+HEIGHT=$(($(printf "${CONFIGURATION}" | wc -l) + 8))
+
+whiptail --clear --title "${TITLE}" --yesno "${CONFIGURATION}" ${HEIGHT} 100 3>&1 1>&2 2>&3 3>&-
 
 case $? in
   0) msg info "Proceeding....";;
-  1|255) msg info "Installation aborted...."; exit 1;;
+  1|255) msg info "Installation aborted..."; exit 1;;
 esac
 
 RUNTIME=$(date +%s)
-prepare && installation && cleanup
+prepare && install && cleanup
 RUNTIME=$(echo ${RUNTIME} $(date +%s) | awk '{ printf "%0.2f",($2-$1)/60 }')
 
 msg info "Time: ${RUNTIME} minutes"
