@@ -48,7 +48,8 @@ Have some unpartitioned disk space, or create and resize partitions for Windows 
 
 #### Fast startup and hibernation
 > [!CAUTION]
-> Data loss can occur if Windows hibernates and you dual boot into Arch and make changes to files on a filesystem (such as NTFS) that can be read and written to by Windows and Linux, and that has been mounted by Windows.  
+> Data loss can occur if Windows hibernates and you dual boot into Arch and make changes to files on a filesystem (such as NTFS) that can be read and written to by Windows and Linux, and that has been mounted by Windows.
+>
 > Vice-versa is also true so the **safest option is to disable both** fast startup and hibernation.
 
 - **Disable Fast Startup and disable hibernation**:  
@@ -107,3 +108,16 @@ chmod +x ./bluetooth-dualboot-sync-keys.sh && sudo ./bluetooth-dualboot-sync-key
 
 #### Links
 [Bluetooth DualBoot Pairing](https://wiki.archlinux.org/title/Bluetooth#Dual_boot_pairing)
+
+## Bluetooth Autosuspend Rules `bluetooth-suspend-rules.sh`
+Small bash script for enabling or disabling bluetooth controler autosuspend and peripherials wakeup from suspend udev rules.
+
+On most motherboards the bluetooth controller is a USB device. The default timeout before a USB device goes to idle is 2000 ms.
+Once bluetooth goes to idle it is not easy to wake it up as the connected bluetooth peripherials will not work. So it's better to disable autosuspend for the Bluetooth USB device to avoid unnecessary frustrations.
+
+To allow bluetooth peripherials (keyboards, mice, etc.) to wakeup the system from suspend also make sure that wake from USB is not disabled in BIOS.
+
+```bash
+curl -o bluetooth-suspend-rules.sh https://raw.githubusercontent.com/munchauz3n/helper-scripts/refs/heads/main/bluetooth-suspend-rules.sh
+chmod +x ./bluetooth-suspend-rules.sh && sudo ./bluetooth-suspend-rules.sh
+```
