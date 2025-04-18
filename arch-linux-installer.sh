@@ -79,10 +79,10 @@ declare -a HWVIDEOACCELERATION=(
 
 # List of possible additional packages.
 declare -a EXTRAPKGS=(
-  "Touchpad" "Install for touchpad support via the libinput driver" "off"
-  "Touchscreen" "Install for touchscreen support via the libinput driver" "off"
-  "Wacom" "Install for Wacom stylus support" "off"
-  "Bluetooth" "Install for Bluetooth support" "off"
+  "Touchpad" "Touchpad support via the libinput driver" "off"
+  "Touchscreen" "Touchscreen support via the libinput driver" "off"
+  "Wacom" "Wacom stylus support" "off"
+  "Bluetooth" "Bluetooth support" "off"
 )
 
 declare TITLE="Arch Linux Installer"
@@ -449,24 +449,6 @@ function setup_console_environment() {
 }
 
 function setup_common_environment() {
-  msg log "Installing Xorg display server and xinitrc..."
-  pacstrap ${TMPDIR} xorg-server xorg-xinit 1> /dev/null 2>&1
-
-  # Check pacstrap return value.
-  [[ $? == +(1|255) ]] && { msg error "Failed to install xorg and xinitrc!"; exit 1; }
-
-  msg log "Installing basic desktop tools..."
-  pacstrap ${TMPDIR} xdg-utils 1> /dev/null 2>&1
-
-  # Check pacstrap return value.
-  [[ $? == +(1|255) ]] && { msg error "Failed to install basic desktop tools!"; exit 1; }
-
-  msg log "Installing video drivers..."
-  pacstrap ${TMPDIR} xf86-video-vesa 1> /dev/null 2>&1
-
-  # Check pacstrap return value.
-  [[ $? == +(1|255) ]] && { msg error "Failed to install vesa drivers!"; exit 1; }
-
   if [[ ${GPUDRIVERS[@]} == *"AMD"* ]]; then
     msg log "Installing GPU drivers for AMD..."
     pacstrap ${TMPDIR} mesa vulkan-icd-loader vulkan-radeon 1> /dev/null 2>&1
@@ -552,7 +534,7 @@ function setup_common_environment() {
     pacstrap ${TMPDIR} bluez bluez-utils 1> /dev/null 2>&1
 
     # Check pacstrap return value.
-    [[ $? == +(1|255) ]] && { msg error "Failed to install Wacom packages!"; exit 1; }
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Bluetooth packages!"; exit 1; }
 
     msg log "Enabling the Bluetooth service..."
     arch-chroot ${TMPDIR} systemctl enable bluetooth.service 1> /dev/null 2>&1
@@ -696,12 +678,20 @@ function setup_gnome_environment() {
            gnome-remote-desktop gnome-screenshot gnome-session gnome-settings-daemon gnome-shell \
            gnome-shell-extensions gnome-system-monitor gnome-terminal gnome-tweaks gnome-weather \
            gnome-themes-extra gnome-user-docs gnome-user-share gnome-video-effects gnome-software \
-           gnome-icon-theme-extras gnome-firmware gnome-keyring networkmanager mutter nautilus \
-           power-profiles-daemon sushi gvfs yelp guake system-config-printer pulseaudio pavucontrol \
-           dav1d x265 vlc 1> /dev/null 2>&1
+           gnome-icon-theme-extras gnome-firmware gnome-keyring networkmanager mutter nautilus guake \
+           power-profiles-daemon sushi gvfs yelp system-config-printer pulseaudio pavucontrol \
+           wayland-protocols dav1d x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install GNOME packages!"; exit 1; }
+
+  if [[ ${EXTRAPKGS[@]} == *"Bluetooth"* ]]; then
+    msg log "Installing GNOME Bluetooth packages..."
+    pacstrap ${TMPDIR} gnome-bluetooth-3.0 pulseaudio-bluetooth 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install GNOME bluetooth packages!"; exit 1; }
+  fi
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
@@ -724,16 +714,24 @@ function setup_kde_environment() {
   msg log "Installing KDE packages..."
   pacstrap ${TMPDIR} plasma-workspace plasma-desktop plasma-nm plasma-pa plasma-systemmonitor \
            plasma-wayland-protocols plasma-disks plasma-workspace-wallpapers plasma-thunderbolt \
-           plasma-vault plasma-browser-integration plasma-firewall kdeplasma-addons kinfocenter\
-           kscreen kgamma kjournald kdialog kcron kwallet-pam kwalletmanager ksshaskpass konsole \
-           kweather ksystemlog krdp kjournald kdeconnect kwrited drkonqi xdg-desktop-portal-kde \
-           kde-gtk-config dolphin breeze breeze-gtk oxygen oxygen-sounds networkmanager sweeper \
-           discover wayland-protocols power-profiles-daemon powerdevil bluedevil partitionmanager \
-           spectacle gwenview kate yakuake qalculate-qt pulseaudio pavucontrol print-manager \
-           system-config-printer dav1d x265 vlc 1> /dev/null 2>&1
+           plasma-browser-integration plasma-firewall kdeplasma-addons kinfocenter kscreen kgamma \
+           kjournald kdialog kcron konsole kweather ksystemlog krdp kjournald kdeconnect kwrited \
+           kcrash kwallet kwalletmanager drkonqi kde-gtk-config dolphin breeze breeze-gtk oxygen \
+           oxygen-sounds sweeper networkmanager discover wayland-protocols power-profiles-daemon \
+           powerdevil spectacle vlc phonon-qt6-vlc phonon-qt6 dav1d x265 gwenview kate yakuake \
+           pulseaudio pavucontrol partitionmanager print-manager system-config-printer kcalc ark \
+           1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install KDE packages!"; exit 1; }
+
+  if [[ ${EXTRAPKGS[@]} == *"Bluetooth"* ]]; then
+    msg log "Installing KDE Bluetooth packages..."
+    pacstrap ${TMPDIR} bluedevil pulseaudio-bluetooth 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install KDE bluetooth packages!"; exit 1; }
+  fi
 
   if [[ ${DISPLAYMANAGER} == "SDDM" ]]; then
     msg log "Installing SDDM KConfig Module..."
@@ -767,10 +765,19 @@ function setup_xfce_environment() {
            xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-xkb-plugin xfce4-mount-plugin \
            xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-sensors-plugin xfce4-settings \
            xfce4-terminal xfce4-screensaver pulseaudio pavucontrol xfdesktop xfconf networkmanager \
-           network-manager-applet system-config-printer blueman dav1d x265 vlc 1> /dev/null 2>&1
+           xarchiver thunar-archive-plugin network-manager-applet system-config-printer dav1d \
+           x265 vlc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install XFCE packages!"; exit 1; }
+
+  if [[ ${EXTRAPKGS[@]} == *"Bluetooth"* ]]; then
+    msg log "Installing XFCE Bluetooth packages..."
+    pacstrap ${TMPDIR} blueman pulseaudio-bluetooth 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install XFCE bluetooth packages!"; exit 1; }
+  fi
 
   msg log "Configuring NetworkManager to use iwd as the Wi-Fi backend..."
   echo "[device]" > ${TMPDIR}/etc/NetworkManager/conf.d/wifi-backend.conf
@@ -1573,8 +1580,8 @@ MICROCODES=($(whiptail "${FLAGS[@]}" "${MICROCODES[@]}" 3>&1 1>&2 2>&3 3>&-))
 HEIGHT=$((${#KERNELPARAMS[@]} / 3 + 10))
 LISTHEIGHT=$((${#KERNELPARAMS[@]} / 3))
 
-DESCRIPTION="Optional additional kernel boot parameters (press space):"
-FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+DESCRIPTION="Optional kernel boot parameters which are not normally required (press space):"
+FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 100 ${LISTHEIGHT})
 
 KERNELPARAMS=($(whiptail "${FLAGS[@]}" "${KERNELPARAMS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
