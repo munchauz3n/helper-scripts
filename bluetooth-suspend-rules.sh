@@ -39,8 +39,8 @@ declare -a FLAGS=()
 
 declare -a CTRLS=()
 
-declare -a ENABLED_POWERSAVE_RULES=()
-declare -a DISABLED_POWERSAVE_RULES=()
+declare -A ENABLED_POWERSAVE_RULES=()
+declare -A DISABLED_POWERSAVE_RULES=()
 
 declare WAKEUP_RULE=""
 declare WAKEUP_RULE_STATE="NO CHANGE"
@@ -126,9 +126,11 @@ for ID in ${TMPLIST[@]}; do
   ENTRY="ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\""
   ENTRY="${ENTRY}, ATTR{idProduct}==\"${PID}\", ATTR{power/autosuspend_delay_ms}=\"-1\""
 
-  cat ${POWERSAVE_RULES_FILE} | grep -q "${ENTRY}" && state="on" || state="off"
-
-  CTRLS+=("${ID}" "${DESCRIPTION}" "${state}")
+  if [[ -f ${POWERSAVE_RULES_FILE} ]] && cat ${POWERSAVE_RULES_FILE} | grep -q "${ENTRY}"; then
+    CTRLS+=("${ID}" "${DESCRIPTION}" "on")
+  else
+    CTRLS+=("${ID}" "${DESCRIPTION}" "off")
+  fi
 done
 
 # Calculate the height based on the number of entries and increase by 8 for window compensation.
@@ -152,9 +154,10 @@ for ID in ${CTRLS[@]}; do
   ENTRY="ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\""
   ENTRY="${ENTRY}, ATTR{idProduct}==\"${PID}\", ATTR{power/autosuspend_delay_ms}=\"-1\""
 
-  cat ${POWERSAVE_RULES_FILE} | grep -q "${ENTRY}" && continue
+  # Skip ifrules file exists and rule is already present in it.
+  [[ -f ${POWERSAVE_RULES_FILE} ]] && { cat ${POWERSAVE_RULES_FILE} | grep -q "${ENTRY}" && continue; }
 
-  ENABLED_POWERSAVE_RULES+=(${ENTRY})
+  ENABLED_POWERSAVE_RULES[${ID}]="${ENTRY}"
 done
 
 if [[ ${#ENABLED_POWERSAVE_RULES[@]} -ne 0 ]]; then
@@ -172,7 +175,7 @@ for ID in ${TMPLIST[@]}; do
   ENTRY="ACTION==\"add\", SUBSYSTEM==\"usb\", ATTR{idVendor}==\"${VID}\""
   ENTRY="${ENTRY}, ATTR{idProduct}==\"${PID}\", ATTR{power/autosuspend_delay_ms}=\"-1\""
 
-  DISABLED_POWERSAVE_RULES+=(${ENTRY})
+  DISABLED_POWERSAVE_RULES[${ID}]="${ENTRY}"
 done
 
 if [[ ${#DISABLED_POWERSAVE_RULES[@]} -ne 0 ]]; then
@@ -224,22 +227,24 @@ if [[ ${#ENABLED_POWERSAVE_RULES[@]} -ne 0 ]]; then
   # Create the rules file in case it doesn't exist.
   [[ ! -f ${POWERSAVE_RULES_FILE} ]] && touch ${POWERSAVE_RULES_FILE}
 
-  for ENTRY in ${ENABLED_POWERSAVE_RULES[@]}; do
-    echo "${ENTRY}" >> ${POWERSAVE_RULES_FILE};
+  for ID in ${!ENABLED_POWERSAVE_RULES[@]}; do
+    echo "${ENABLED_POWERSAVE_RULES[${ID}]}" >> ${POWERSAVE_RULES_FILE};
   done
 fi
 
 if [[ ${#DISABLED_POWERSAVE_RULES[@]} -ne 0 ]]; then
-  for ENTRY in ${DISABLED_POWERSAVE_RULES[@]}; do
-    sed -i '/'${ENTRY}'/d' ${POWERSAVE_RULES_FILE}
+  for ID in ${!DISABLED_POWERSAVE_RULES[@]}; do
+    ENTRY="${DISABLED_POWERSAVE_RULES[${ID}]////\\/}"
+    sed -i "/${ENTRY// /\\ }/d" ${POWERSAVE_RULES_FILE}
   done
 fi
 
-if [[ ${WAKEUP_RULE_STATE} != "ENABLE" ]]; then
+if [[ ${WAKEUP_RULE_STATE} == "ENABLE" ]]; then
   # Create the rules file in case it doesn't exist.
   [[ ! -f ${WAKEUP_RULES_FILE} ]] && touch ${WAKEUP_RULES_FILE}
 
   echo "${WAKEUP_RULE}" >> ${WAKEUP_RULES_FILE};
-elif [[ ${WAKEUP_RULE_STATE} != "DISABLE" ]]; then
-  sed -i '/'${WAKEUP_RULE}'/d' ${WAKEUP_RULES_FILE}
+elif [[ ${WAKEUP_RULE_STATE} == "DISABLE" ]]; then
+  WAKEUP_RULE=${WAKEUP_RULE////\\/}
+  sed -i "/${WAKEUP_RULE// /\\ }/d" ${WAKEUP_RULES_FILE}
 fi
