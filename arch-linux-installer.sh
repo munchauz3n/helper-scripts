@@ -77,6 +77,16 @@ declare -a HWVIDEOACCELERATION=(
   "Intel VA-API(<= Haswell)" "Video Acceleration API drivers for Intel GPUs (<= Haswell)" "off"
 )
 
+# List of possible video and audio players.
+declare -a MEDIAPLAYERS=(
+  "VLC" "Multi-platform MPEG, VCD/DVD, and DivX player (minimal install)" "on"
+  "MPV" "A minimalistic cross-platform player with built-in codecs" "off"
+  "SMPlayer" "Media player with built-in codecs with MPV as backend" "off"
+  "Amarok" "Powerful cross-platform music player that lets you rediscover your music" "off"
+  "Rhythmbox" "Powerful music playback and management application (default for GNOME)" "off"
+  "Kaffeine" "Media player with VLC as backend (default for KDE)" "off"
+)
+
 # List of possible additional packages.
 declare -a EXTRAPKGS=(
   "Touchpad" "Touchpad support via the libinput driver" "off"
@@ -513,6 +523,57 @@ function setup_common_environment() {
     [[ $? == +(1|255) ]] && { msg error "Failed to install VA-API drivers for Haswell!"; exit 1; }
   fi
 
+  if [[ ${MEDIAPLAYERS[@]} == *"VLC"* ]]; then
+    msg log "Installing VLC packages..."
+    pacstrap ${TMPDIR} vlc-plugin-base vlc-plugin-dav1d lc-plugin-x264 vlc-plugin-x265 \
+             vlc-plugin-ffmpeg vlc-plugin-mpeg2 vlc-plugin-matroska vlc-plugin-libsecret \
+             vlc-plugin-ass vlc-plugin-freetype vlc-plugin-srt vlc-plugin-smb vlc-plugin-notify \
+             vlc-plugins-visualization vlc 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install VLC packages!"; exit 1; }
+  fi
+
+  if [[ ${MEDIAPLAYERS[@]} == *"MPV"* ]]; then
+    msg log "Installing MPV packages..."
+    pacstrap ${TMPDIR} mpv 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install MPV packages!"; exit 1; }
+  fi
+
+  if [[ ${MEDIAPLAYERS[@]} == *"SMPlayer"* ]]; then
+    msg log "Installing SMPlayer packages..."
+    pacstrap ${TMPDIR} smplayer 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install SMPlayer packages!"; exit 1; }
+  fi
+
+  if [[ ${MEDIAPLAYERS[@]} == *"Amarok"* ]]; then
+    msg log "Installing Amarok packages..."
+    pacstrap ${TMPDIR} amarok 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Amarok packages!"; exit 1; }
+  fi
+
+  if [[ ${MEDIAPLAYERS[@]} == *"Rhythmbox"* ]]; then
+    msg log "Installing Rhythmbox packages..."
+    pacstrap ${TMPDIR} rhythmbox 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Rhythmbox packages!"; exit 1; }
+  fi
+
+  if [[ ${MEDIAPLAYERS[@]} == *"Kaffeine"* ]]; then
+    msg log "Installing Kaffeine packages..."
+    pacstrap ${TMPDIR} kaffeine 1> /dev/null 2>&1
+
+    # Check pacstrap return value.
+    [[ $? == +(1|255) ]] && { msg error "Failed to install Kaffeine packages!"; exit 1; }
+  fi
+
   if [[ ${EXTRAPKGS[@]} == *"Touchscreen"* || ${EXTRAPKGS[@]} == *"Touchpad"* ]]; then
     msg log "Installing touchscreen/touchpad packages..."
     pacstrap ${TMPDIR} xf86-input-libinput 1> /dev/null 2>&1
@@ -680,7 +741,7 @@ function setup_gnome_environment() {
            gnome-themes-extra gnome-user-docs gnome-user-share gnome-video-effects gnome-software \
            gnome-icon-theme-extras gnome-firmware gnome-keyring networkmanager mutter nautilus guake \
            power-profiles-daemon sushi gvfs yelp system-config-printer pulseaudio pavucontrol \
-           wayland-protocols dav1d x265 vlc 1> /dev/null 2>&1
+           wayland-protocols 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install GNOME packages!"; exit 1; }
@@ -718,9 +779,8 @@ function setup_kde_environment() {
            kjournald kdialog kcron konsole kweather ksystemlog krdp kjournald kdeconnect kwrited \
            kcrash kwallet kwalletmanager drkonqi kde-gtk-config dolphin breeze breeze-gtk oxygen \
            oxygen-sounds sweeper networkmanager discover wayland-protocols power-profiles-daemon \
-           powerdevil spectacle vlc phonon-qt6-vlc phonon-qt6 dav1d x265 gwenview kate yakuake \
-           pulseaudio pavucontrol partitionmanager print-manager system-config-printer kcalc ark \
-           1> /dev/null 2>&1
+           powerdevil spectacle phonon-qt6 gwenview kate yakuake pulseaudio pavucontrol ark \
+           partitionmanager print-manager system-config-printer kcalc 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install KDE packages!"; exit 1; }
@@ -760,13 +820,13 @@ function setup_kde_environment() {
 
 function setup_xfce_environment() {
   msg log "Installing XFCE packages..."
-  pacstrap ${TMPDIR} exo garcon mousepad thunar thunar-volman tumbler xfwm4 xfwm4-themes ristretto \
-           xfce4-appfinder xfce4-panel xfce4-power-manager xfce4-session xfce4-pulseaudio-plugin \
-           xfce4-taskmanager xfce4-screenshooter xfce4-notifyd xfce4-xkb-plugin xfce4-mount-plugin \
-           xfce4-whiskermenu-plugin xfce4-battery-plugin xfce4-sensors-plugin xfce4-settings \
-           xfce4-terminal xfce4-screensaver pulseaudio pavucontrol xfdesktop xfconf networkmanager \
-           xarchiver thunar-archive-plugin network-manager-applet system-config-printer dav1d \
-           x265 vlc 1> /dev/null 2>&1
+  pacstrap ${TMPDIR} exo garcon mousepad thunar thunar-volman xarchiver thunar-archive-plugin \
+           tumbler xfwm4 xfwm4-themes ristretto xfce4-appfinder xfce4-panel xfce4-power-manager \
+           xfce4-session xfce4-pulseaudio-plugin xfce4-taskmanager xfce4-screenshooter \
+           xfce4-notifyd xfce4-xkb-plugin xfce4-mount-plugin xfce4-whiskermenu-plugin \
+           xfce4-battery-plugin xfce4-sensors-plugin xfce4-settings xfce4-terminal \
+           xfce4-screensaver pulseaudio pavucontrol xfdesktop xfconf networkmanager \
+           network-manager-applet system-config-printer 1> /dev/null 2>&1
 
   # Check pacstrap return value.
   [[ $? == +(1|255) ]] && { msg error "Failed to install XFCE packages!"; exit 1; }
@@ -1645,7 +1705,7 @@ if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == 
   LISTHEIGHT=$((${#BROWSERS[@]} / 3))
 
   DESCRIPTION="Pick one of more internet browsers (press space):"
-  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 90 ${LISTHEIGHT})
+  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 80 ${LISTHEIGHT})
 
   BROWSERS=($(whiptail "${FLAGS[@]}" "${BROWSERS[@]}" 3>&1 1>&2 2>&3 3>&-))
 
@@ -1671,6 +1731,24 @@ if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == 
   fi
 fi
 
+# -------------------------------------------------------------------------------------------------
+if [[ ${ENVIRONMENT} == "GNOME" || ${ENVIRONMENT} == "KDE" || ${ENVIRONMENT} == "XFCE" ]]; then
+  # Calculate the height based on the number of entries and increase by 10 for window compensation.
+  HEIGHT=$((${#MEDIAPLAYERS[@]} / 3 + 10))
+  LISTHEIGHT=$((${#MEDIAPLAYERS[@]} / 3))
+
+  DESCRIPTION="Pick media players (press space):"
+  FLAGS=(--clear --title "${TITLE}" --checklist "${DESCRIPTION}" ${HEIGHT} 100 ${LISTHEIGHT})
+
+  MEDIAPLAYERS=($(whiptail "${FLAGS[@]}" "${MEDIAPLAYERS[@]}" 3>&1 1>&2 2>&3 3>&-))
+
+  # Check whiptail window return value.
+  [[ $? == +(1|255) ]] && { msg info "Installation aborted..."; exit 1; }
+
+  [ ${#MEDIAPLAYERS[@]} != 0 ] && CONFIGURATION+="\n  Media players = ${MEDIAPLAYERS[@]}"
+fi
+
+# -------------------------------------------------------------------------------------------------
 # Calculate the height based on the number of entries and increase by 10 for window compensation.
 HEIGHT=$((${#EXTRAPKGS[@]} / 3 + 10))
 LISTHEIGHT=$((${#EXTRAPKGS[@]} / 3))
